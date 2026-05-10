@@ -13,8 +13,15 @@ import org.apache.mina.filter.codec.textline.LineDelimiter;
 import org.apache.mina.filter.codec.textline.TextLineCodecFactory;
 import org.apache.mina.transport.socket.nio.NioSocketAcceptor;
 import org.dofus.network.game.handlers.GameScreenHandler;
+import org.dofus.utils.PacketLogger;
+import org.dofus.utils.RateLimiter;
+import org.dofus.utils.ServerMetrics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Game implements IoHandler {
+
+	private static final Logger logger = LoggerFactory.getLogger(Game.class);
 
 	private final IoAcceptor acceptor;
 	private boolean started;
@@ -34,16 +41,27 @@ public class Game implements IoHandler {
 	
 	@Override
 	public void exceptionCaught(IoSession session, Throwable object) throws Exception {
-		System.out.println("[Game-" + session.getId() + "] exception " + object.getMessage());
+		logger.error("[Game-{}] exception: {}", session.getId(), object.getMessage());
 		session.write("BN");
 	}
 
 	@Override
 	public void messageReceived(IoSession session, Object object) throws Exception {
 		String packet = (String) object;
-		
-		System.out.println("[Game-" + session.getId() + "] received " + packet);
-		
+
+		// ── Anti-flood : rate limiting par session ────────────────────────────
+		if(!RateLimiter.allow(session.getId())) {
+			// Si 3 bans consécutifs, l'état a été purgé → fermeture forcée
+			if(!RateLimiter.isTracked(session.getId())) {
+				logger.warn("[Game-{}] flood excessif — session fermée", session.getId());
+				session.close(false);
+			}
+			return;
+		}
+
+		ServerMetrics.onPacketReceived();
+		PacketLogger.recv("Game", session.getId(), packet);
+
 		if(packet.equals("ping"))
 			session.write("pong");
         else if(packet.equals("qping"))
@@ -54,18 +72,20 @@ public class Game implements IoHandler {
 
 	@Override
 	public void messageSent(IoSession session, Object object) throws Exception {
-		System.out.println("[Game-" + session.getId() + "] sent " + (String) object);
+		ServerMetrics.onPacketSent();
+		PacketLogger.sent("Game", session.getId(), object);
 	}
 
 	@Override
 	public void sessionClosed(IoSession session) throws Exception {
-		System.out.println("[Game-" + session.getId() + "] closed");
+		logger.debug("[Game-{}] closed", session.getId());
+		RateLimiter.remove(session.getId());
 		((GameClient) session.getAttribute("client")).getHandler().onClosed();
 	}
 
 	@Override
 	public void sessionCreated(IoSession session) throws Exception {
-		System.out.println("[Game-" + session.getId() + "] created");
+		logger.debug("[Game-{}] created", session.getId());
 		
 		GameClient client = new GameClient(this, session);
 		client.setHandler(new GameScreenHandler(this, client));
@@ -75,12 +95,12 @@ public class Game implements IoHandler {
 
 	@Override
 	public void sessionIdle(IoSession session, IdleStatus object) throws Exception {
-		System.out.println("[Game-" + session.getId() + "] idle");
+		logger.debug("[Game-{}] idle", session.getId());
 	}
 
 	@Override
 	public void sessionOpened(IoSession session) throws Exception {
-		System.out.println("[Game-" + session.getId() + "] opened");
+		logger.debug("[Game-{}] opened", session.getId());
 	}
 
 	public void start(short port) throws IOException {
@@ -90,7 +110,7 @@ public class Game implements IoHandler {
 		acceptor.bind(new InetSocketAddress(port));
         started = true;
         
-        System.out.println("Game listening on port " + port);
+        logger.info("Game listening on port {}", port);
 	}
 	
 	public void stop() {
@@ -106,7 +126,7 @@ public class Game implements IoHandler {
         acceptor.dispose();
         started = false;
         
-        System.out.println("Game successfully stoped");
+        logger.info("Game stopped");
 	}
 	
 }

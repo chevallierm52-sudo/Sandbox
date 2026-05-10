@@ -13,9 +13,13 @@ import org.apache.mina.filter.codec.textline.LineDelimiter;
 import org.apache.mina.filter.codec.textline.TextLineCodecFactory;
 import org.apache.mina.transport.socket.nio.NioSocketAcceptor;
 import org.dofus.network.server.handlers.VersionHandler;
-
+import org.dofus.utils.PacketLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Server implements IoHandler {
+
+	private static final Logger logger = LoggerFactory.getLogger(Server.class);
 
 	private final IoAcceptor acceptor;
 	private boolean started;
@@ -35,39 +39,39 @@ public class Server implements IoHandler {
 	
 	@Override
 	public void exceptionCaught(IoSession session, Throwable object) throws Exception {
-		System.out.println("[Server-" + session.getId() + "] exception " + object.getMessage());
+		logger.error("[Server-{}] exception: {}", session.getId(), object.getMessage());
 	}
 
 	@Override
 	public void messageReceived(IoSession session, Object object) throws Exception {
-		System.out.println("[Server-" + session.getId() + "] received " + (String) object);
+		PacketLogger.recv("Server", session.getId(), object);
 		((ServerClient) session.getAttribute("server")).getHandler().parse((String) object);
 	}
 
 	@Override
 	public void messageSent(IoSession session, Object object) throws Exception {
-		System.out.println("[Server-" + session.getId() + "] sent " + (String) object);
+		PacketLogger.sent("Server", session.getId(), object);
 	}
 
 	@Override
 	public void sessionClosed(IoSession session) throws Exception {
-		System.out.println("[Server-" + session.getId() + "] closed");
+		logger.debug("[Server-{}] closed", session.getId());
 		((ServerClient) session.getAttribute("server")).getHandler().onClosed();
 	}
 
 	@Override
 	public void sessionCreated(IoSession session) throws Exception {
-		System.out.println("[Server-" + session.getId() + "] created");
+		logger.debug("[Server-{}] created", session.getId());
 	}
 
 	@Override
 	public void sessionIdle(IoSession session, IdleStatus object) throws Exception {
-		System.out.println("[Server-" + session.getId() + "] idle");
+		logger.debug("[Server-{}] idle", session.getId());
 	}
 
 	@Override
 	public void sessionOpened(IoSession session) throws Exception {
-		System.out.println("[Server-" + session.getId() + "] opened");
+		logger.debug("[Server-{}] opened", session.getId());
 		
 		ServerClient client = new ServerClient(session);
 		client.setHandler(new VersionHandler(this, client));
@@ -82,7 +86,7 @@ public class Server implements IoHandler {
 		acceptor.bind(new InetSocketAddress(port));
         started = true;
         
-        System.out.println("Server listening on port " + port);
+        logger.info("Server listening on port {}", port);
 	}
 	
 	public void stop() {
@@ -98,6 +102,6 @@ public class Server implements IoHandler {
         acceptor.dispose();
         started = false;
         
-        System.out.println("Server successfully stoped");
+        logger.info("Server stopped");
 	}
 }

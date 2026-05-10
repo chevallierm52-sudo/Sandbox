@@ -5,64 +5,67 @@ import org.dofus.constants.EConstants;
 import org.dofus.objects.actors.Characters;
 import org.dofus.objects.characters.Statistic;
 import org.dofus.objects.characters.breeds.Breed.BreedType;
+import org.dofus.utils.DeferredSaveService;
+import org.dofus.utils.PacketValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BoostParser {
 
-	public static void boost(Characters character, IoSession session, int packet) {
-		/** FIXME: Finish
-		 * Ancestra aussi faire plus propre
-    	 * Créer un timer dès le premier boost stat et sauvegarder au bout de 3min
-    	 * ca evite de save à chaque boost
-    	 */
-		int value = 0;
-		Characters player = character;
-		switch(packet) {
-			case 10://Force
-				value = player.getStats().getEffect(EConstants.ADD_STRENGTH.getInt());
-			break;
-			case 13://Chance
-				value = player.getStats().getEffect(EConstants.ADD_CHANCE.getInt());
-			break;
-			case 14://Agilit�
-				value = player.getStats().getEffect(EConstants.ADD_AGILITY.getInt());
-			break;
-			case 15://Intelligence
-				value = player.getStats().getEffect(EConstants.ADD_INTELLIGENCE.getInt());
-			break;
+	private static final Logger logger = LoggerFactory.getLogger(BoostParser.class);
+
+	/**
+	 * Stat IDs sent by the client:
+	 *   10 = Strength, 11 = Vitality, 12 = Wisdom
+	 *   13 = Chance,   14 = Agility,  15 = Intelligence
+	 *
+	 * Cost formula (paliers) is in Statistic.getReqPtsToBoostStatsByClass().
+	 * Sacrieur special: 1 stat point → 2 Vitality.
+	 */
+	public static void boost(Characters character, IoSession session, int statId) {
+		// Validation anti-cheat : statId connu + valeur raisonnable
+		if(!PacketValidator.validateStatBoost(session.getId(), statId, character.getStatsPoint() > 0 ? 1 : 0)) {
+			session.write("BN");
+			return;
 		}
-		
-		int cout = Statistic.getReqPtsToBoostStatsByClass(player.getBreed().getId(), packet, value);
-		
-		if(cout <= player.getStatsPoint()) {
-			switch(packet) {
-				case 11://Vita
-					int val = 1;
-					if(player.getBreed().getId() == BreedType.SACRIEUR.getValue())
-						val = 2;
-					
-					player.getStats().add(EConstants.ADD_VITALITY.getInt(), val);
-				break;
-				case 12://Sage
-					player.getStats().add(EConstants.ADD_WISDOM.getInt(), 1);
-				break;
-				case 10://Force
-					player.getStats().add(EConstants.ADD_STRENGTH.getInt(), 1);
-				break;
-				case 13://Chance
-					player.getStats().add(EConstants.ADD_CHANCE.getInt(), 1);
-				break;
-				case 14://Agilit�
-					player.getStats().add(EConstants.ADD_AGILITY.getInt(), 1);
-				break;
-				case 15://Intelligence
-					player.getStats().add(EConstants.ADD_INTELLIGENCE.getInt(), 1);
-				break;
-				default:
-					return;
-			}
-			
-			player.setStatsPoint((short) (player.getStatsPoint() - cout));
-			session.write(Statistic.getStatisticsMessage(player));
+		int currentValue;
+		switch(statId) {
+			case 10: currentValue = character.getStats().getEffect(EConstants.ADD_STRENGTH.getInt());     break;
+			case 11: currentValue = character.getStats().getEffect(EConstants.ADD_VITALITY.getInt());     break;
+			case 12: currentValue = character.getStats().getEffect(EConstants.ADD_WISDOM.getInt());       break;
+			case 13: currentValue = character.getStats().getEffect(EConstants.ADD_CHANCE.getInt());       break;
+			case 14: currentValue = character.getStats().getEffect(EConstants.ADD_AGILITY.getInt());      break;
+			case 15: currentValue = character.getStats().getEffect(EConstants.ADD_INTELLIGENCE.getInt()); break;
+			default:
+				logger.warn("Unknown stat id {} for boost (character {})", statId, character.getName());
+				return;
 		}
+
+		int cost = Statistic.getReqPtsToBoostStatsByClass(character.getBreed().getId(), statId, currentValue);
+
+		if(cost > character.getStatsPoint()) {
+			logger.debug("Boost refused for {} stat={} cost={} available={}",
+				new Object[] { character.getName(), statId, cost, character.getStatsPoint()});
+			return;
+		}
+
+		switch(statId) {
+			case 10: character.getStats().add(EConstants.ADD_STRENGTH.getInt(),     1); break;
+			case 11:
+				int gain = (character.getBreed().getId() == BreedType.SACRIEUR.getValue()) ? 2 : 1;
+				character.getStats().add(EConstants.ADD_VITALITY.getInt(), gain);
+				break;
+			case 12: character.getStats().add(EConstants.ADD_WISDOM.getInt(),       1); break;
+			case 13: character.getStats().add(EConstants.ADD_CHANCE.getInt(),       1); break;
+			case 14: character.getStats().add(EConstants.ADD_AGILITY.getInt(),      1); break;
+			case 15: character.getStats().add(EConstants.ADD_INTELLIGENCE.getInt(), 1); break;
+		}
+
+		character.setStatsPoint((short) (character.getStatsPoint() - cost));
+		session.write(Statistic.getStatisticsMessage(character));
+		DeferredSaveService.schedule(character);
+
+		logger.debug("Boost {} stat={} cost={} remaining={}",
+			new Object[] { character.getName(), statId, cost, character.getStatsPoint()});
 	}
 }

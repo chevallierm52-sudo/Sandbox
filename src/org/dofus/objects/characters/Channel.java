@@ -7,7 +7,11 @@ public class Channel {
 	ArrayList<String> channels = new ArrayList<String>(9);
 	
 	public Channel(ArrayList<String> channel) {
-		this.channels = channel; 
+		if(channel == null || channel.isEmpty()) {
+			channels.add(getBase());
+		} else {
+			this.channels = channel;
+		}
 	}
 	 
 	public void addChannel(String c) {
@@ -16,20 +20,13 @@ public class Channel {
 	}
 	
 	public void removeChannel(String c) {
-		for(int size = 0; size < channels.size(); size++)
-			if(channels.contains(c))
-				channels.remove(c);
+		channels.remove(c);
 	}
 
 	public String get() {
 		StringBuilder channel = new StringBuilder();
-		
-		if(channels.isEmpty() || channels == null) //Connection RolePlayHandler()
-			channels.add(getBase());
-		
 		for(int size = 0; size < channels.size(); size++)
 			channel.append(channels.get(size));
-		
 		return channel.toString();
 	}
 	
@@ -37,6 +34,8 @@ public class Channel {
 		return ChannelType.TEAM.getChannel() +
 			   ChannelType.PARTY.getChannel() +
 			   ChannelType.DEFAULT.getChannel() +
+			   ChannelType.TRADE.getChannel() +
+			   ChannelType.RECRUITMENT.getChannel() +
 			   ChannelType.INFORMATION.getChannel();
 	}
 

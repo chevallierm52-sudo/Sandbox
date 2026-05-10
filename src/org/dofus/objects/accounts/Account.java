@@ -96,19 +96,15 @@ public class Account {
 	}
 	
 	public Characters getCharacterById(int id) {
-		if(characters.containsKey(id))
-			return characters.get(id);
-		return null;
+		return characters.get(id);
 	}
-	
+
 	public void addCharacter(Characters character) {
-		if(!getCharacters().containsKey(character.getId()))
-			getCharacters().put(character.getId(), character);
+		characters.putIfAbsent(character.getId(), character);
 	}
-	
+
 	public void removeCharacter(Characters character) {
-		if(getCharacters().containsKey(character.getId()))
-			getCharacters().remove(character.getId());
+		characters.remove(character.getId());
 	}
 	
 	public IoSession getSession() {

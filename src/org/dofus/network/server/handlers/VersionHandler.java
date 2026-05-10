@@ -3,8 +3,12 @@ package org.dofus.network.server.handlers;
 import org.dofus.network.server.Server;
 import org.dofus.network.server.ServerClient;
 import org.dofus.network.server.ServerClientHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class VersionHandler extends ServerClientHandler {
+
+	private static final Logger logger = LoggerFactory.getLogger(VersionHandler.class);
 
 	public VersionHandler(Server server, ServerClient client) {
 		super(server, client);
@@ -23,7 +27,7 @@ public class VersionHandler extends ServerClientHandler {
 
 	@Override
 	public void onClosed() {
-		System.out.println("VersionHandler : onClosed()");
+		logger.debug("VersionHandler closed");
 	}
 
 }

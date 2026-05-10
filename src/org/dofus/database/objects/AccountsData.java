@@ -9,110 +9,92 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.dofus.database.Connector;
 import org.dofus.objects.accounts.Account;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AccountsData {
 
-	/**
-	 * XXX: Tous les lengths de la table accounts sont fixé sur 16
-	 */
-	
-	private static final Connection connection = Connector.getConnection();
-	
-	//By id
-	private static final ConcurrentMap<Integer, Account> accounts = new ConcurrentHashMap<Integer, Account>();
-	//By username
-	private static final ConcurrentMap<String, Account> accountsByUsername = new ConcurrentHashMap<String, Account>();
-	//By key
-	private static final ConcurrentMap<String, Account> accountsByKey = new ConcurrentHashMap<String, Account>();
-	
+	private static final Logger logger = LoggerFactory.getLogger(AccountsData.class);
+
+	private static final ConcurrentMap<Integer, Account> accounts           = new ConcurrentHashMap<>();
+	private static final ConcurrentMap<String, Account>  accountsByUsername = new ConcurrentHashMap<>();
+	private static final ConcurrentMap<String, Account>  accountsByKey      = new ConcurrentHashMap<>();
+
 	public static Account load(String username) {
-		if(!accountsByUsername.containsKey(username.toLowerCase())) { //Si le compte n'est pas dans le hashMap
+		if(!accountsByUsername.containsKey(username.toLowerCase())) {
+			Connection conn = Connector.acquire();
 			try {
-				ResultSet reader = connection
-	            		.createStatement()
-	            		.executeQuery("SELECT * FROM `accounts` WHERE `username` = '" + username + "';");
-				
-				while(reader.next()) {
-					Account account = new Account(
-							reader.getInt("id"), 
-							reader.getString("username").toLowerCase(), 
-							reader.getString("password"), 
-							reader.getString("secret_question"), 
-							reader.getString("secret_answer"), 
-							reader.getString("nickname"), 
-							(reader.getInt("banned") == 1));
-					
-					accounts.put(account.getId(), account);
-					accountsByUsername.put(account.getUsername(), account);
-					
-					System.out.println("Account " + username + " loaded with success");
+				PreparedStatement stmt = conn.prepareStatement(
+						"SELECT * FROM `accounts` WHERE `username` = ?");
+				stmt.setString(1, username);
+				try(ResultSet reader = stmt.executeQuery()) {
+					while(reader.next()) {
+						Account account = new Account(
+								reader.getInt("id"),
+								reader.getString("username").toLowerCase(),
+								reader.getString("password"),
+								reader.getString("secret_question"),
+								reader.getString("secret_answer"),
+								reader.getString("nickname"),
+								(reader.getInt("banned") == 1));
+
+						accounts.put(account.getId(), account);
+						accountsByUsername.put(account.getUsername(), account);
+						logger.debug("Account {} loaded", username);
+					}
+				} finally {
+					stmt.close();
 				}
-				
 			} catch(SQLException e) {
-				System.out.println("Impossible to load accounts " + username + " : " + e.getMessage());
+				logger.error("Impossible to load account {}: {}", username, e.getMessage());
 				return null;
+			} finally {
+				Connector.release(conn);
 			}
 		}
-		return accountsByUsername.get(username);
+		return accountsByUsername.get(username.toLowerCase());
 	}
-	
+
 	public static boolean nicknameIsExist(String nickname) {
+		Connection conn = Connector.acquire();
 		try {
-			ResultSet reader = connection
-            		.createStatement()
-            		.executeQuery("SELECT `nickname` FROM `accounts` WHERE `nickname` LIKE '" + nickname + "';");
-			
-			while(reader.next()) {
-				if(reader.getString("nickname").toLowerCase().equals(nickname.toLowerCase()))
-					return true;
-				else
-					return false;
+			PreparedStatement stmt = conn.prepareStatement(
+					"SELECT `nickname` FROM `accounts` WHERE `nickname` = ?");
+			stmt.setString(1, nickname);
+			try(ResultSet reader = stmt.executeQuery()) {
+				if(reader.next())
+					return reader.getString("nickname").equalsIgnoreCase(nickname);
+			} finally {
+				stmt.close();
 			}
 		} catch(SQLException e) {
-			System.out.println("Impossible to load accounts " + nickname + " : " + e.getMessage());
+			logger.error("Impossible to check nickname {}: {}", nickname, e.getMessage());
 			return true;
+		} finally {
+			Connector.release(conn);
 		}
 		return false;
 	}
-	
+
 	public static void updateNickname(Account account) throws SQLException {
-		if(account != null) {
-			String query = "UPDATE `accounts` SET `nickname` = '" + account.getNickname() + "' WHERE `id` = " + account.getId() + ";";
-			
-			PreparedStatement statement = connection.prepareStatement(query);
-			
-			statement.execute();
-			
-			statement.clearParameters();
-	        statement.close();
+		if(account == null) return;
+		Connection conn = Connector.acquire();
+		try {
+			PreparedStatement stmt = conn.prepareStatement(
+					"UPDATE `accounts` SET `nickname` = ? WHERE `id` = ?");
+			stmt.setString(1, account.getNickname());
+			stmt.setInt(2, account.getId());
+			stmt.execute();
+			stmt.close();
+		} finally {
+			Connector.release(conn);
 		}
 	}
-	
-	public static Account getAccountById(int id) {
-		if(!accounts.containsKey(id))
-			return null;
-		return accounts.get(id);
-	}
-	
-	public static Account getAccountByName(String username) {
-		if(!accountsByUsername.containsKey(username))
-			return null;
-		return accountsByUsername.get(username);
-	}
 
-	public static Account getAccountByKey(String key) {
-		if(!accountsByKey.containsKey(key))
-			return null;
-		return accountsByKey.get(key);
-	}
-	
-	public static void addAccountByKey(Account account, String key) {
-		if(!accountsByKey.containsKey(key))
-			accountsByKey.put(key, account);
-	}
-	
-	public static void removeAccountByKey(String key) {
-		if(accountsByKey.containsKey(key))
-			accountsByKey.remove(key);
-	}
+	public static Account getAccountById(int id)         { return accounts.get(id); }
+	public static Account getAccountByName(String name)  { return accountsByUsername.get(name); }
+	public static Account getAccountByKey(String key)    { return accountsByKey.get(key); }
+
+	public static void addAccountByKey(Account account, String key) { accountsByKey.putIfAbsent(key, account); }
+	public static void removeAccountByKey(String key)               { accountsByKey.remove(key); }
 }

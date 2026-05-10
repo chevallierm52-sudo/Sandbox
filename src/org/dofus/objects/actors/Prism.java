@@ -33,4 +33,10 @@ public class Prism implements IActor {
 		// TODO Auto-generated method stub
 		return 0;
 	}
+
+	@Override
+	public int getId() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 }

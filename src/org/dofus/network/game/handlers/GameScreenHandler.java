@@ -1,8 +1,10 @@
 package org.dofus.network.game.handlers;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.concurrent.ConcurrentMap;
 
 import org.dofus.constants.EApplication;
@@ -25,6 +27,8 @@ import org.dofus.objects.experiences.CharacterExperience;
 import org.dofus.utils.StringUtils;
 
 public class GameScreenHandler extends GameClientHandler {
+
+	private static final Logger logger = LoggerFactory.getLogger(GameScreenHandler.class);
 
 	public boolean authenticated;
 	
@@ -111,7 +115,7 @@ public class GameScreenHandler extends GameClientHandler {
 	                
 	        default:
 	        	if(!packet.equals("Af"))
-	        		System.out.println("Unknow paquet <" + packet + "> in ServerScreenHandler");
+	        		logger.warn("Unknown packet <{}> in GameScreenHandler", packet);
 	        	
 	        	client.getSession().write("BN");
             }
@@ -129,7 +133,7 @@ public class GameScreenHandler extends GameClientHandler {
 
 	@Override
 	public void onClosed() {
-		System.out.println("GameScreenHandler : onClosed()");
+		logger.debug("GameScreenHandler closed");
 	}
 
 	private void parseCharacterCreationRequestMessage(String name, Byte breed, Byte gender,
@@ -192,7 +196,7 @@ public class GameScreenHandler extends GameClientHandler {
 				client.getAccount().addCharacter(character);
 				client.setCharacters(character);
 			} catch(Exception e) {
-				System.out.println(e.getMessage());
+				logger.error("Character creation failed: {}", e.getMessage());
 			}
 			
 			client.getSession().write("AAK"); //creation success
@@ -282,14 +286,15 @@ public class GameScreenHandler extends GameClientHandler {
             ));
 
             client.getAccount().setConnected(true);
-            
+
             client.setCharacters(character);
             client.getCharacter().setConnected(true);
-            
+
             WorldData.addCharacterById(character, character.getId());
             WorldData.addCharacterByName(character, character.getName());
             WorldData.addSessionByAccount(client.getAccount(), client.getSession());
-            
+            WorldData.addController(character.getId(), client);
+
             client.setHandler(new RolePlayHandler(game, client));
         }
 	}
@@ -312,7 +317,9 @@ public class GameScreenHandler extends GameClientHandler {
         return sb.toString();
     }
     
+    private static final AtomicLong ID_COUNTER = new AtomicLong(System.currentTimeMillis());
+
     public static long uniqueId() {
-        return Long.parseLong(new SimpleDateFormat("ddhhmmssMs").format(new Date()));
+        return ID_COUNTER.incrementAndGet();
     }
 }

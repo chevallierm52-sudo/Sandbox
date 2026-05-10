@@ -5,13 +5,18 @@ import org.dofus.network.game.GameClient;
 import org.dofus.network.game.protocols.GProtocol;
 import org.dofus.objects.WorldData;
 import org.dofus.objects.actors.Characters;
+import org.dofus.objects.actors.NPC;
 import org.dofus.objects.characters.Statistic;
 import org.dofus.objects.maps.MapTemplate;
 import org.apache.mina.core.session.IoSession;
 import org.dofus.game.actions.IGameAction.ActionTypeEnum;
 import org.dofus.game.actions.IGameAction.GameActionType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GameParser {
+
+	private static final Logger logger = LoggerFactory.getLogger(GameParser.class);
 
 	public static void action(IoSession session, GameClient client, String packet) {
 		if(packet.length() < 5) {
@@ -30,7 +35,7 @@ public class GameParser {
             }
             break;
 		default:
-			System.out.println("Unknow actionType for parseGamePacket " + packet);
+			logger.warn("Unknown actionType for parseGamePacket: {}", packet);
 			break;
 		}
 	}
@@ -42,20 +47,33 @@ public class GameParser {
     			+ character.getCurrentMap().getId() + "|"
     			+ character.getCurrentMap().getDate() + "|"
     			+ character.getCurrentMap().getKey() + "|");
-    	session.write("fC" + 0); //nbr fight
+    	// fC0 envoyé ici (phase GC) ET dans information() après GDK (phase GI),
+    	// comme AncestraRemake et Shivas le font (deux envois, comportement attendu).
+    	session.write("fC0");
 	}
 
 	//FIXME BOT MOUVEMENT : c'es
 	public static void information(Characters character, IoSession session, GameClient client, MapTemplate map) {
-	    map.addActor(character);
-	 
+		if(map.getActor(character.getId()) == null)
+	    	map.addActor(character);
+
+	    // Ordre conforme AncestraRemake/Shivas : personnages d'abord, PNJ ensuite.
+	    // Les personnages (y compris le joueur courant, déjà ajouté à la map ci-dessus)
+	    // sont envoyés en premier, puis les PNJ dans le même paquet GM.
 	    StringBuilder allActors = new StringBuilder("GM");
-	 
+
+	    // 1) Personnages (joueurs + bots)
 	    for (Characters actor : map.getActors().values()) {
 	        allActors.append("|+");
 	        GProtocol.getCharacterPattern(allActors, actor);
 	    }
-	 
+
+	    // 2) PNJ (champ 6 = -4, discriminant NPC pour le client Flash)
+	    for(NPC npc : map.getNpcs().values()) {
+	        allActors.append("|+");
+	        GProtocol.getNpcPattern(allActors, npc);
+	    }
+
 	    session.write(allActors.toString());
 	 
 	    StringBuilder newActor = new StringBuilder("GM|+");
@@ -84,15 +102,18 @@ public class GameParser {
 	}
 
 	public static void endAction(GameClient client, boolean success, String args) throws Exception {
-        if(success)
+		if(client.getActions().isEmpty())
+			return;
+
+        if(success) {
             client.getActions().pop().end();
-        else {
+        } else {
             if(client.getActions().peek().getActionType() != GameActionType.MOVEMENT)
                 throw new Exception("invalid action : peeked action isn't a movement");
 
-            ((RolePlayMovement) client.getActions().pop()).cancel(Short.parseShort(args.substring(2)));
+            short cellId = (args.length() >= 3) ? Short.parseShort(args.substring(2)) : client.getCharacter().getCurrentCell();
+            ((RolePlayMovement) client.getActions().pop()).cancel(cellId);
         }
-		
 	}
 
 }

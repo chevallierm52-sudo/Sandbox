@@ -32,4 +32,10 @@ public class MountPark implements IActor {
 		// TODO Auto-generated method stub
 		return 0;
 	}
+
+	@Override
+	public int getId() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 }

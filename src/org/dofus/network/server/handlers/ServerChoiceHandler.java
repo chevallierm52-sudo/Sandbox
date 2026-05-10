@@ -10,8 +10,12 @@ import org.dofus.network.server.Server;
 import org.dofus.network.server.ServerClient;
 import org.dofus.network.server.ServerClientHandler;
 import org.dofus.objects.actors.Characters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ServerChoiceHandler extends ServerClientHandler {
+
+	private static final Logger logger = LoggerFactory.getLogger(ServerChoiceHandler.class);
 
 	protected ServerChoiceHandler(Server server, ServerClient client) {
 		super(server, client);
@@ -61,7 +65,7 @@ public class ServerChoiceHandler extends ServerClientHandler {
 
 	@Override
 	public void onClosed() {
-		System.out.println("ServerChoiceHandler : onClosed()");
+		logger.debug("ServerChoiceHandler closed");
 	}
 
 }

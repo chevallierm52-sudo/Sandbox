@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.dofus.objects.actors.Characters;
 import org.dofus.objects.actors.EOrientation;
+import org.dofus.objects.actors.NPC;
+import org.dofus.objects.monsters.MonsterGroup;
 import org.dofus.utils.StringUtils;
 
 public class MapTemplate {
@@ -23,8 +25,10 @@ public class MapTemplate {
     private String places;
 
     private final HashMap<Short, TriggerTemplate> triggers = new HashMap<>();
-    
-    private Map<Integer, Characters> actors = new ConcurrentHashMap<>();
+
+    private Map<Integer, Characters>    actors        = new ConcurrentHashMap<>();
+    private final Map<Integer, NPC>     npcs          = new ConcurrentHashMap<>();
+    private final Map<Integer, MonsterGroup> monsters  = new ConcurrentHashMap<>();
  
     public MapTemplate(int id, byte abscissa, byte ordinate, byte width, byte height, short subarea, String key, String date, boolean subscriberArea, String places) {
         this.id = id;
@@ -106,6 +110,29 @@ public class MapTemplate {
 	
 	public void removeActor(Characters actor) {
 		getActors().remove(actor.getId());
+	}
+
+	public Map<Integer, NPC> getNpcs() { return npcs; }
+
+	public void addNpc(NPC npc) {
+		npcs.put(npc.getActorId(), npc);
+	}
+
+	/** Look up an NPC by its actor ID (spawnId + 100_000). */
+	public NPC getNpc(int actorId) {
+		return npcs.get(actorId);
+	}
+
+	// ── Monstres ──────────────────────────────────────────────────────────────
+
+	public Map<Integer, MonsterGroup> getMonsterGroups() { return monsters; }
+
+	public void addMonsterGroup(MonsterGroup group) {
+		monsters.put(group.getId(), group);
+	}
+
+	public void removeMonsterGroup(MonsterGroup group) {
+		monsters.remove(group.getId());
 	}
 
 	public static class TriggerTemplate {

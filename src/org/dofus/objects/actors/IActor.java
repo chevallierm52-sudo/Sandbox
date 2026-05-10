@@ -30,4 +30,6 @@ public interface IActor {
         	return actorType;
         }
     }
+
+	int getId();
 }

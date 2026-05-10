@@ -26,7 +26,11 @@ public class WorldData {
 	public static void addController(int characterId, Object controller) {
 		controllers.put(characterId, controller);
 	}
-	
+
+	public static void removeController(int characterId) {
+		controllers.remove(characterId);
+	}
+
 	public static Object getController(int characterId) {
 		return controllers.get(characterId);
 	}
@@ -49,14 +53,17 @@ public class WorldData {
 		return characters;
 	}
 	
-	public static void addCharacterById(Characters character, int id) {
-		if(!characters.containsKey(id))
-			characters.put(id, character);
+	/** Accès direct par ID (lookup O(1)). */
+	public static Characters getCharacterById(int id) {
+		return characters.get(id);
 	}
-	
+
+	public static void addCharacterById(Characters character, int id) {
+		characters.putIfAbsent(id, character);
+	}
+
 	public static void removeCharacterById(int id) {
-		if(characters.containsKey(id))
-			characters.remove(id);
+		characters.remove(id);
 	}
 	
 	public static ConcurrentMap<String, Characters> getCharacterByName() {

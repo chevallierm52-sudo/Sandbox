@@ -9,39 +9,38 @@ import java.util.Map;
 import org.dofus.Main;
 import org.dofus.database.Connector;
 import org.dofus.objects.experiences.Experience;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ExperiencesData {
 
-	private static final Connection connection = Connector.getConnection();
-	
-	//By level - Character
-	private static final Map<Short, Experience> character = new HashMap<Short, Experience>();
-	
+	private static final Logger logger = LoggerFactory.getLogger(ExperiencesData.class);
+
+	private static final Map<Short, Experience> character = new HashMap<>();
+
 	public static void load() {
+		Connection conn = Connector.acquire();
 		try {
-			ResultSet reader = connection
-            		.createStatement()
-            		.executeQuery("SELECT * FROM experience_templates;");
-			
-			while(reader.next()) {
-				Experience experience = new Experience(
-						reader.getShort("level"), 
-						reader.getLong("character"), 
-						reader.getInt("job"), 
-						reader.getInt("mount"), 
-						reader.getShort("alignment"));
-				
-				character.put(experience.getLevel(), experience);
-				System.out.println("Experience " + experience.getLevel() + " loaded with success");
+			try(ResultSet reader = conn.createStatement()
+					.executeQuery("SELECT * FROM experience_templates")) {
+				while(reader.next()) {
+					Experience experience = new Experience(
+							reader.getShort("level"),
+							reader.getLong("character"),
+							reader.getInt("job"),
+							reader.getInt("mount"),
+							reader.getShort("alignment"));
+					character.put(experience.getLevel(), experience);
+				}
 			}
-			
+			logger.info("{} experience level(s) loaded", character.size());
 		} catch(SQLException e) {
-			System.out.println("Impossible to load experience templates : " + e.getMessage());
+			logger.error("Impossible to load experience templates: {}", e.getMessage());
 			Main.stop();
+		} finally {
+			Connector.release(conn);
 		}
 	}
-	
-	public static Experience get(short level) {
-		return character.get(level);
-	}
+
+	public static Experience get(short level) { return character.get(level); }
 }

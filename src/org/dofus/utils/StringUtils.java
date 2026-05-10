@@ -17,11 +17,11 @@ import org.apache.mina.core.buffer.IoBuffer;
 public class StringUtils {
 	
     private static int random(int min, int max) {
-        return (int)(Math.random() * max + min);
+        return min + (int)(Math.random() * (max - min + 1));
     }
 
     public static char random(String str) {
-        return str.charAt(random(0, str.length()));
+        return str.charAt(random(0, str.length() - 1));
     }
  
     public static final String ALPHABET = "abcdefghijklmnopqrstuvwxyz";

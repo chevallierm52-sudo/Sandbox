@@ -15,6 +15,7 @@ import org.dofus.objects.characters.breeds.Breed;
 import org.dofus.objects.characters.breeds.Spell;
 import org.dofus.objects.experiences.AlignmentExperience;
 import org.dofus.objects.experiences.CharacterExperience;
+import org.dofus.objects.items.Inventory;
 import org.dofus.objects.maps.MapTemplate;
 
 public class Characters implements IActor {
@@ -63,8 +64,12 @@ public class Characters implements IActor {
 	private Party party;
 	private String invitation;
 	
-	private boolean displacement = false;
-	private boolean connected = false;
+	private boolean     displacement = false;
+	private boolean     connected    = false;
+	private NpcTemplate dialogNpc    = null;
+
+	/** Inventaire du personnage (initialisé au chargement ou à la création). */
+	private Inventory   inventory    = new Inventory();
 
 	public Characters(int id, Account owner, String name, Breed breed, byte gender, int color1, int color2, int color3,
 			short skin, short size, MapTemplate currentMap, short currentCell, EOrientation currentOrientation,
@@ -375,8 +380,24 @@ public class Characters implements IActor {
 		this.connected = connected;
 	}
 
+	public NpcTemplate getDialogNpc() {
+		return dialogNpc;
+	}
+
+	public void setDialogNpc(NpcTemplate dialogNpc) {
+		this.dialogNpc = dialogNpc;
+	}
+
+	public Inventory getInventory() {
+		return inventory;
+	}
+
+	public void setInventory(Inventory inventory) {
+		this.inventory = inventory;
+	}
+
 	public short getMaxPods() {
-		return (short) (1000 + getStats().getEffect(EConstants.ADD_STRENGTH.getShort() * 5));
+		return (short) (1000 + getStats().getEffect(EConstants.ADD_STRENGTH.getInt()) * 5);
 	}
 
 	public String parseParty()

@@ -3,6 +3,8 @@ package org.dofus.network.game.protocols;
 import java.util.Map;
 
 import org.dofus.objects.actors.Characters;
+import org.dofus.objects.actors.NPC;
+import org.dofus.objects.actors.NpcTemplate;
 import org.dofus.utils.StringUtils;
 
 public class GProtocol {
@@ -54,6 +56,43 @@ public class GProtocol {
 	
 	    sb.append(';')
 	      .append("0;;");
+	}
+
+	/**
+	 * Entrée GM d'un PNJ (format Dofus 1.29, confirmé Shivas + AncestraRemake) :
+	 *   cell;dir;0;actorId;templateId;-4;gfxId^scale;sex;color1;color2;color3;accessories;extraClip;customArtWork
+	 *
+	 * Le client Flash distingue un PNJ d'un personnage via le champ 6 :
+	 *   - Personnage : field6 = classe (1-12, positif)
+	 *   - PNJ        : field6 = -4 (négatif = discriminant NPC)
+	 * Sans templateId et -4, le client tente de parser le PNJ comme un
+	 * personnage → exception interne → écran noir.
+	 *
+	 * Scale : gfxId^size si scaleX==scaleY, sinon gfxId^scaleXxscaleY.
+	 * extraClip : toujours -1 (valeurs DB non nulles peuvent crasher Flash).
+	 */
+	public static void getNpcPattern(StringBuilder sb, NPC npc) {
+		NpcTemplate tpl = npc.getTemplate();
+		sb.append(npc.getCellId()).append(';')
+		  .append(npc.getOrientation().ordinal()).append(';')
+		  .append("0;")
+		  .append(npc.getActorId()).append(';')
+		  .append(tpl.getId()).append(';')   // templateId (champ 5)
+		  .append("-4;")                     // type NPC   (champ 6)
+		  .append(tpl.getGfxID()).append('^');
+		if (tpl.getScaleX() == tpl.getScaleY()) {
+		    sb.append(tpl.getScaleX());
+		} else {
+		    sb.append(tpl.getScaleX()).append('x').append(tpl.getScaleY());
+		}
+		sb.append(';')
+		  .append(tpl.getSex()).append(';')
+		  .append(StringUtils.toHexOrNegative(tpl.getColor1())).append(';')
+		  .append(StringUtils.toHexOrNegative(tpl.getColor2())).append(';')
+		  .append(StringUtils.toHexOrNegative(tpl.getColor3())).append(';')
+		  .append(tpl.buildAccessories()).append(';')
+		  .append(-1).append(';')   // extraClip : toujours -1
+		  .append(0);               // customArtWork : toujours 0
 	}
 
 }

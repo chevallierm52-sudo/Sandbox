@@ -1,29 +1,50 @@
 package org.dofus.network.game.handlers;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import org.apache.mina.core.session.IoSession;
 import org.dofus.database.objects.CharactersData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.dofus.network.game.Game;
 import org.dofus.network.game.GameClient;
 import org.dofus.network.game.GameClientHandler;
+import org.dofus.network.game.handlers.parsers.AdminParser;
+import org.dofus.network.game.handlers.parsers.BankParser;
 import org.dofus.network.game.handlers.parsers.BasicParser;
+import org.dofus.network.game.handlers.parsers.CraftParser;
 import org.dofus.network.game.handlers.parsers.BoostParser;
+import org.dofus.utils.ChatFilter;
+import org.dofus.utils.DeferredSaveService;
 import org.dofus.network.game.handlers.parsers.ChannelParser;
+import org.dofus.network.game.handlers.parsers.DialogParser;
+import org.dofus.network.game.handlers.parsers.ExchangeParser;
+import org.dofus.network.game.handlers.parsers.FightParser;
 import org.dofus.network.game.handlers.parsers.GameParser;
+import org.dofus.network.game.handlers.parsers.GuildParser;
+import org.dofus.network.game.handlers.parsers.InventoryParser;
 import org.dofus.network.game.handlers.parsers.PartyParser;
+import org.dofus.objects.items.Inventory;
+import org.dofus.network.game.handlers.parsers.QuestParser;
 import org.dofus.network.game.handlers.parsers.WaypointParser;
 import org.dofus.objects.WorldData;
 import org.dofus.objects.actors.Characters;
+import org.dofus.utils.RegenService;
 import org.dofus.utils.StringUtils;
 
 public class RolePlayHandler extends GameClientHandler {
-	
-	IoSession session = client.getSession();
-	Characters character = client.getCharacter();
-	
+
+	private static final Logger logger = LoggerFactory.getLogger(RolePlayHandler.class);
+
+	private final IoSession session;
+	private final Characters character;
+
 	protected RolePlayHandler(Game game, GameClient client) {
 		super(game, client);
+		this.session   = client.getSession();
+		this.character = client.getCharacter();
 		session.write("cC+" + character.getChannels());
 		//Guild
 		//Subarea
@@ -32,7 +53,10 @@ public class RolePlayHandler extends GameClientHandler {
 		//Spell
 		session.write("SL"); //Spell list message
 		session.write("AR" + character.getRestriction().toBase36());
-		session.write("Ow0|" + character.getMaxPods()); //TODO "Ow" + usedPods + "|" + maxPods;
+		// Inventaire au login
+		Inventory inv = character.getInventory();
+		session.write(inv.buildOLPacket());
+		session.write("Ow" + inv.getUsedPods() + "|" + character.getMaxPods());
 		session.write("eL0|"); //Quest?
 		session.write("BD" + StringUtils.CURRENT_DATE_FORMATTER.format(new Date())); // Send actual time
 		
@@ -77,37 +101,40 @@ public class RolePlayHandler extends GameClientHandler {
 			case 'c':
 				parseChannelPacket(packet);
 			break;
-			/*case 'D':
+			case 'D':
 				parseDialogPacket(packet);
-			break;		
-			case 'E':
-				parseExchangePacket(packet);
 			break;
-			case 'e':
+			case 'E':
+				ExchangeParser.parse(character, session, packet);
+			break;
+			/*case 'e':
 				parseEnvironementPacket(packet);
 			break;
 			case 'F':
 				parseFriendPacket(packet);
-			break;
-			case 'f':
-				parseFightPacket(packet);
 			break;*/
+			case 'f':
+				FightParser.parseFightPacket(character, session, packet);
+			break;
 			case 'G':
 				parseGamePacket(packet);
 			break;
-			/*case 'g':
-				parseGuildPacket(packet);
+			case 'g':
+				GuildParser.parse(character, session, packet);
 			break;
-			case 'O':
-				parseObjectPacket(packet);
-			break;*/
+			case 'O': // Inventaire / équipement
+				InventoryParser.parse(character, session, packet);
+			break;
+			case 'M': // Métier / artisanat
+				CraftParser.parse(character, session, packet);
+			break;
 			case 'P':
 				parsePartyPacket(packet);
-			break;/*
-			case 'Q':
-				parseQuestPacket(packet);
 			break;
-			case 'R':
+			case 'Q':
+				QuestParser.parse(character, session, packet);
+			break;
+			/*case 'R':
 				parseMountPacket(packet);
 			break;
 			case 'S':
@@ -157,12 +184,26 @@ public class RolePlayHandler extends GameClientHandler {
 		}
 	}
 
+	private void parseDialogPacket(String packet) {
+		switch(packet.charAt(1)) {
+			case 'C': // DC{actorId} — open dialog
+				DialogParser.create(character, session, packet);
+			break;
+			case 'R': // DR{replyId} — chose reply
+				DialogParser.reply(character, session, packet);
+			break;
+			case 'V': // DV — close dialog
+				DialogParser.quit(character, session);
+			break;
+		}
+	}
+
 	private void parseBasicsPacket(String packet) {
 		switch(packet.charAt(1)) {
 			case 'a': //Movement by click-map
 				switch(packet.charAt(2)) {
 					case 'M':
-						BasicParser.moveByClickMap(packet);
+						BasicParser.moveByClickMap(character, session, client, packet);
 					break;
 				}
 				break;
@@ -170,8 +211,15 @@ public class RolePlayHandler extends GameClientHandler {
 				break;
 			case 'D': //Date
 				break;
+			case 'd': // Bd — ouverture banque
+			case 'k': // Bk — dépôt kamas
+			case 'q': // Bq — retrait kamas
+			case 'i': // Bi — dépôt item
+			case 'o': // Bo — retrait item
+				BankParser.parse(character, session, packet);
+				break;
 			case 'M': //Message
-				BasicParser.channelsMessage(character, session, packet);
+				BasicParser.channelsMessage(character, session, client, packet);
 				break;
 			case 'S': //Emote
 				BasicParser.emoticons(character, packet);
@@ -192,19 +240,36 @@ public class RolePlayHandler extends GameClientHandler {
 
 	private void parseGamePacket(String packet) throws Exception {
         switch(packet.charAt(1)) {
-        case 'A': //Action
-        	GameParser.action(session, client, packet);
+        case 'A': // GA — action (mouvement hors-combat OU action combat)
+            if(FightParser.getFightForCharacter(character) != null) {
+                // En combat → routage vers FightParser
+                FightParser.parseAction(character, session, packet);
+            } else {
+                GameParser.action(session, client, packet);
+            }
             break;
-        case 'C': //GameCreation
+        case 'C': // GC — création personnage
         	GameParser.creation(character, session);
             break;
-
-        case 'I': //GameInformation
+        case 'I': // GI — informations carte
         	GameParser.information(character, session, client, character.getCurrentMap());
             break;
-
-        case 'K': //End Action
-        	GameParser.endAction(client, packet.charAt(2) == 'K', packet.substring(3));
+        case 'K': // GK — fin d'action
+        	if(packet.length() > 2)
+        	    GameParser.endAction(client, packet.charAt(2) == 'K', packet.substring(3));
+            break;
+        case 'R': // GR{groupId} — attaque un groupe de monstres
+            if(packet.length() > 2) {
+                try {
+                    int groupId = Integer.parseInt(packet.substring(2));
+                    FightParser.initiateFightVsMonsters(character, session, groupId);
+                } catch(NumberFormatException e) { /* ignore */ }
+            }
+            break;
+        case 'S': // GS — passer son tour en combat (alias de fN)
+            if(FightParser.getFightForCharacter(character) != null) {
+                FightParser.parseFightPacket(character, session, "fN");
+            }
             break;
         }
 	}
@@ -213,21 +278,31 @@ public class RolePlayHandler extends GameClientHandler {
 	public void onClosed() {
 		//Check si c'est une déconnexion ou un changement de perso
 		character.getCurrentMap().removeActor(character);
-        for(Characters actor : character.getCurrentMap().getActors().values()) {
+		List<Characters> snapshot = new ArrayList<>(character.getCurrentMap().getActors().values());
+        for(Characters actor : snapshot) {
         	IoSession actorSession = WorldData.getSessionByAccount().get(actor.getOwner());
-        	if(!actorSession.equals(client.getSession()))
+        	if(actorSession != null && actorSession.isConnected() && !actorSession.equals(client.getSession()))
         		actorSession.write("GM|-" + character.getId());
        	}
         
+        DeferredSaveService.cancel(character.getId());
         CharactersData.update(character);
-        
+
 		WorldData.removeCharacterById(character.getId());
 		WorldData.removeCharacterByName(character.getName());
 		WorldData.removeSessionByAccount(client.getAccount());
+		WorldData.removeController(character.getId());
 		CharactersData.removeCharacter(character);
 		
+		character.setDialogNpc(null);
 		character.setConnected(false);
 		client.getAccount().setConnected(false);
-		System.out.println("RolePlayHandler : onClosed()");
+
+		// Nettoyage des services stateful
+		ChatFilter.remove(character.getId());
+		BankParser.evictCache(client.getAccount().getId());
+		RegenService.stop(character);
+
+		logger.debug("RolePlayHandler closed for character {}", character.getName());
 	}
 }

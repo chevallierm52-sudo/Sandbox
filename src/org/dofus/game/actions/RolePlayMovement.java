@@ -21,25 +21,16 @@ public class RolePlayMovement implements IGameAction {
 	}
 	
 	public static void teleport(GameClient client, MapTemplate nextMap, short cellId) {
-		System.out.println("teleport ");
-        if(client.isBusy())
-            System.out.println("client is busy.");
-
         if(nextMap == null)
         	return;
-        
+
+        String removePacket = "GM|-" + client.getCharacter().getId();
         for(Characters actor : client.getCharacter().getCurrentMap().getActors().values()) {
-        	IoSession actorSession = WorldData.getSessionByAccount().get(actor.getOwner());
-        	for(Characters actors : client.getCharacter().getMapId().getActors().values()) {
-    			
-    			if(client.getCharacter() != null && actors.getId() == client.getCharacter().getId())
-    				continue;
-    			if(actorSession == null || !actorSession.isConnected())
-    				continue;
-    				
-    			actorSession.write("GM|-" + client.getCharacter().getId());
-    		}
-       	}
+            if(actor == client.getCharacter()) continue;
+            IoSession actorSession = WorldData.getSessionByAccount().get(actor.getOwner());
+            if(actorSession == null || !actorSession.isConnected()) continue;
+            actorSession.write(removePacket);
+        }
         
         client.getCharacter().getCurrentMap().removeActor(client.getCharacter());
         client.getCharacter().setCurrentMap(nextMap);
@@ -64,31 +55,28 @@ public class RolePlayMovement implements IGameAction {
 
 	@Override
 	public void begin() {
-		System.out.println("debut begin");
+		String movePacket = "GA1;1;" + client.getCharacter().getId() + ";" + this.getPath();
 		for(Characters actors : client.getCharacter().getCurrentMap().getActors().values()) {
 			IoSession actorSession = WorldData.getSessionByAccount().get(actors.getOwner());
-			
 			if(actorSession == null || !actorSession.isConnected())
 				continue;
-			else
-				client.getSession().write("GA1;1;" + client.getCharacter().getId() + ";" + this.getPath());
-			System.out.println("debut begin sans packet");
-			//actorSession.write("GA1;1;" + client.getCharacter().getId() + ";" + this.getPath());
-			System.out.println("apres");
+			actorSession.write(movePacket);
 		}
-		System.out.println("apres begin");
 	}
 
 	@Override
 	public void end() {
+		if(path == null || path.length() < 3)
+			return;
+
 		EOrientation orientation = Cell.decode(path.charAt(path.length() - 3));
         short cellId = Cell.decode(path.substring(path.length() - 2));
 
         client.getCharacter().setCurrentOrientation(orientation);
         client.getCharacter().setCurrentCell(cellId);
-        
+
         TriggerTemplate trigger = client.getCharacter().getCurrentMap().getTriggers().get(cellId);
-        
+
         if(trigger != null)
             teleport(client, MapsData.load(trigger.getNextMap()), trigger.getNextCellId());
 	}

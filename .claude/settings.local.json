@@ -4,7 +4,25 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\cheva\\\\eclipse-workspace\\\\Sandbox\" -Recurse -Force)",
       "Bash(Select-Object FullName, PSIsContainer)",
       "Bash(Sort-Object FullName)",
-      "Bash(Format-Table -AutoSize)"
+      "Bash(Format-Table -AutoSize)",
+      "Bash(ls \"C:/Users/cheva/Desktop/Programmation/libs/\")",
+      "WebSearch",
+      "WebFetch(domain:www.dofux.org)",
+      "WebFetch(domain:dofuzion.wordpress.com)",
+      "WebFetch(domain:www.breakflip.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\cheva\\\\eclipse-workspace\\\\Sandbox\\\\src\" -Recurse -Filter \"*.java\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\cheva\\\\eclipse-workspace\\\\Sandbox\\\\src\" -Directory)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(grep -n \"fC0\\\\|SEND_MAP_GMS\\\\|SEND_MAP_NPCS\\\\|SEND_MAP_MOBS\\\\|GDK\\\\|sendGameCreate\\\\|BD\\\\|GCK\\\\|GDM\\\\|fightContext\\\\|\\\\\"fC\\\\\"\" /tmp/ancestra/revision55/src/game/communication/SocketManager.java | head -60)",
+      "Bash(find /tmp/ancestra -name \"SocketManager.java\" 2>/dev/null)",
+      "Bash(sed -n '3985,4020p' /tmp/ancestra/revision55/src/game/game/GameThread.java)",
+      "Bash(xargs grep -l \"parseGM\\\\|class NPC\\\\|class Npc\")",
+      "Bash(not exist *)",
+      "Bash(dir \"C:\\\\Users\\\\cheva\\\\eclipse-workspace\\\\Sandbox\\\\sql\")"
     ]
   }
 }
