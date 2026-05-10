@@ -53,7 +53,7 @@ public class ItemsData {
     private static void loadTemplates(Connection conn) throws Exception {
         templates.clear();
         try(PreparedStatement ps = conn.prepareStatement(
-                "SELECT id, name, type_id, level, pods, price, gfx_id, effects FROM item_template");
+                "SELECT id, name, type_id, level, weight, price, gfx_id, effects FROM item_template");
             ResultSet rs = ps.executeQuery()) {
             while(rs.next()) {
                 int    id      = rs.getInt("id");

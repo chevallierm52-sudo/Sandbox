@@ -1,34 +1,34 @@
 # BotLearning memory — format: PERSONALITY|uses|reactions|phrase
-SOCIAL|48|0|Quelqu'un peut m'expliquer le système d'alignement ?
-SOCIAL|67|1|Comment ça va aujourd'hui ?
-SOCIAL|63|1|Bonne chasse à tous !
-SOCIAL|49|0|Je cherche un craft, quelqu'un peut m'aider ?
-SOCIAL|52|0|Quelqu'un cherche un groupe pour un donjon ?
-SOCIAL|46|0|N'hésitez pas si vous avez besoin d'aide.
-SOCIAL|51|0|On fait un donjeon ce soir ?
-SOCIAL|68|0|Bonjour tout le monde !
-SOCIAL|55|0|Super ambiance ici comme toujours !
-MERCHANT|36|1|Les prix ont changé depuis la dernière MAJ.
-MERCHANT|32|0|Vente set Bouftou complet, prix à négocier.
-MERCHANT|24|0|Le marché est animé en ce moment.
-MERCHANT|25|0|J'ai des ressources craft disponibles, MP.
-MERCHANT|30|0|Échange possible, faites-moi une offre.
-MERCHANT|31|0|Achat blé, froment et houblon — bon prix !
-MERCHANT|30|0|WTB minerai de cuivre, contactez-moi.
-MERCHANT|26|0|Vente parchemins de vitalité x10.
-WARRIOR|38|1|Le boss de ce donjon est vraiment chaud.
-WARRIOR|25|0|J'ai enfin le set complet pour ce combat !
-WARRIOR|27|0|Ces mobs drop enfin quelque chose d'utile !
-WARRIOR|26|0|3 morts de suite... je rage.
-WARRIOR|25|0|Quelqu'un pour un duel amical ?
-WARRIOR|29|0|GG à ceux qui font des 200 solo.
-WARRIOR|30|0|Qui veut farmer des Chafers ce soir ?
-WARRIOR|23|0|Mon Iop lvl 95 cherche un groupe PvP.
-EXPLORER|47|1|Cette map est superbe sous cet angle.
-EXPLORER|34|1|Je me demande ce qu'il y a sur la prochaine map...
-EXPLORER|33|0|J'ai déjà exploré 80 maps ce mois-ci !
-EXPLORER|34|0|J'ai trouvé un raccourci hier, c'est incroyable.
-EXPLORER|37|0|Toujours en mouvement !
-EXPLORER|40|0|J'adore découvrir de nouvelles zones.
-EXPLORER|27|0|Il parait qu'il y a des ressources rares par ici.
-EXPLORER|39|0|Quelqu'un sait si les Blops sont au nord ou au sud ?
+MERCHANT|76|0|WTB minerai de cuivre, contactez-moi.
+MERCHANT|81|0|Les prix ont changé depuis la dernière MAJ.
+MERCHANT|75|0|Échange possible, faites-moi une offre.
+MERCHANT|79|0|Achat blé, froment et houblon — bon prix !
+MERCHANT|74|0|Vente parchemins de vitalité x10.
+MERCHANT|81|0|Vente set Bouftou complet, prix à négocier.
+MERCHANT|76|0|Le marché est animé en ce moment.
+MERCHANT|76|0|J'ai des ressources craft disponibles, MP.
+EXPLORER|115|0|J'ai trouvé un raccourci hier, c'est incroyable.
+EXPLORER|110|0|Cette map est superbe sous cet angle.
+EXPLORER|108|0|Quelqu'un sait si les Blops sont au nord ou au sud ?
+EXPLORER|102|0|Il parait qu'il y a des ressources rares par ici.
+EXPLORER|110|0|J'ai déjà exploré 80 maps ce mois-ci !
+EXPLORER|96|0|Toujours en mouvement !
+EXPLORER|99|0|Je me demande ce qu'il y a sur la prochaine map...
+EXPLORER|108|0|J'adore découvrir de nouvelles zones.
+SOCIAL|138|0|Comment ça va aujourd'hui ?
+SOCIAL|152|0|Bonne chasse à tous !
+SOCIAL|153|0|Quelqu'un cherche un groupe pour un donjon ?
+SOCIAL|150|0|Quelqu'un peut m'expliquer le système d'alignement ?
+SOCIAL|138|0|Super ambiance ici comme toujours !
+SOCIAL|145|0|N'hésitez pas si vous avez besoin d'aide.
+SOCIAL|136|0|Je cherche un craft, quelqu'un peut m'aider ?
+SOCIAL|142|0|On fait un donjeon ce soir ?
+SOCIAL|150|0|Bonjour tout le monde !
+WARRIOR|74|0|Mon Iop lvl 95 cherche un groupe PvP.
+WARRIOR|80|0|Qui veut farmer des Chafers ce soir ?
+WARRIOR|69|0|GG à ceux qui font des 200 solo.
+WARRIOR|74|0|Le boss de ce donjon est vraiment chaud.
+WARRIOR|66|0|J'ai enfin le set complet pour ce combat !
+WARRIOR|76|0|Ces mobs drop enfin quelque chose d'utile !
+WARRIOR|88|0|3 morts de suite... je rage.
+WARRIOR|63|0|Quelqu'un pour un duel amical ?

@@ -1,5 +1,56 @@
 # Changelog
 
+## [Débogage maps, monstres et diagnostic serveur] — 2026-05-11
+
+### Base de données
+- Reconstruction partielle de la base de données à partir du dossier `database` du projet et des données AncestraR.
+- Recréation des tables et colonnes nécessaires au fonctionnement actuel du serveur.
+- Découpage des fichiers SQL en plusieurs morceaux pour éviter les erreurs `max_allowed_packet`.
+- Correction de problèmes d’encodage sur certaines colonnes `name`.
+- Correction de la table `monster_grades` :
+  - remise en cohérence des colonnes `grade` et `level` ;
+  - suppression des conflits liés aux doublons de clé.
+- Correction de la table `npc_replies` :
+  - adaptation du schéma pour accepter plusieurs actions liées à une même réponse PNJ.
+
+### Commandes joueur / admin
+- Correction du système de commandes avec préfixe `.`.
+- Correction du parsing des paquets `BM*|.commande|`.
+- Ajout de la prise en charge de `.infos` en plus de `.info`.
+- Correction de `.help`, qui était bloquée par le contrôle des droits admin.
+- Séparation des commandes publiques et des commandes réservées aux administrateurs.
+
+### Monstres
+- Débogage du chargement des templates monstres depuis `monster_templates`.
+- Débogage du chargement des grades depuis `monster_grades`.
+- Ajout / correction du système de spawn des monstres depuis la table `monster_spawns`.
+- Correction du chargement des groupes monstres via `map_id`.
+- Ajout de l’appel à `MonstersData.spawnAll(map)` lors du chargement des cartes.
+- Vérification que les groupes monstres sont bien ajoutés dans les objets `MapTemplate`.
+- Correction de la logique évitant les doubles spawns grâce à `areMonsterGroupsSpawned()`.
+- Ajout des groupes monstres au paquet `GM` envoyé lors du `GI`.
+- Débogage des logs réseau pour vérifier que les maps n’envoyaient d’abord que le personnage joueur.
+- Validation du fonctionnement attendu : les monstres doivent maintenant être chargés sur les maps concernées et envoyés au client.
+
+### Maps
+- Vérification du chargement des maps et de leur lien avec les spawns monstres.
+- Correction de la logique pour charger les monstres au moment du chargement de la carte.
+- Vérification du passage entre maps et de l’envoi des paquets `GDM`, `GI`, `GM`, `GDK`.
+
+### Logs et diagnostic
+- Préparation d’un système de logs structurés pour améliorer le débogage serveur.
+- Idée d’un fichier de diagnostic dédié contenant :
+  - classe concernée ;
+  - méthode concernée ;
+  - paquet réseau ;
+  - personnage ;
+  - map ;
+  - message d’erreur ;
+  - stacktrace.
+- Objectif : faciliter l’analyse des bugs liés au réseau, aux maps, aux monstres, aux PNJ, aux objets, aux sorts, aux combats et à la base de données.
+- Les logs devront rester strictement techniques et ne pas contenir de données sensibles.
+
+
 ## [Inventaire, Banque complète, Trade items, Fix MonsterGroup] — 2026-05-10
 
 ### Corrections de compilation

@@ -35,7 +35,7 @@ public class MonstersData {
 
     /** Cache global des templates : id → MonsterTemplate */
     private static final ConcurrentMap<Integer, MonsterTemplate> templates = new ConcurrentHashMap<>();
-
+    
     // ── Chargement global ─────────────────────────────────────────────────────
 
     public static void load() {
@@ -117,10 +117,21 @@ public class MonstersData {
      * @param map La carte cible
      */
     public static void spawnAll(MapTemplate map) {
+        if(map == null) return;
+
+        if(templates.isEmpty()) {
+            logger.warn("MonstersData.spawnAll({}) ignoré : templates monstres non chargés", map.getId());
+            return;
+        }
+
+        if(map.areMonsterGroupsSpawned()) return;
+
         Connection conn = null;
         try {
             conn = Connector.acquire();
-            spawnForMap(conn, map);
+            int count = spawnForMap(conn, map);
+            map.setMonsterGroupsSpawned(true);
+            logger.debug("MonstersData : {} groupe(s) monstre(s) préparé(s) sur map {}", count, map.getId());
         } catch(Exception e) {
             logger.error("MonstersData.spawnAll({}) failed: {}", map.getId(), e.getMessage());
         } finally {
@@ -128,7 +139,8 @@ public class MonstersData {
         }
     }
 
-    private static void spawnForMap(Connection conn, MapTemplate map) throws Exception {
+    private static int spawnForMap(Connection conn, MapTemplate map) throws Exception {
+        int count = 0;
         try(PreparedStatement ps = conn.prepareStatement(
                 "SELECT monster_id, grade, cell_id, orientation, qty " +
                 "FROM monster_spawns WHERE map_id=?")) {
@@ -151,11 +163,13 @@ public class MonstersData {
                     }
                     MonsterGroup group = new MonsterGroup(map, cell, orient, members);
                     map.addMonsterGroup(group);
+                    count++;
                     logger.debug("MonstersData : groupe {} spawné sur map {} cellule {}",
                         new Object[] { group.getId(), map.getId(), cell});
                 }
             }
         }
+        return count;
     }
 
     // ── Accès ─────────────────────────────────────────────────────────────────

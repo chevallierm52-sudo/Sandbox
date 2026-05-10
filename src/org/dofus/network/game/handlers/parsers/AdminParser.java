@@ -69,6 +69,24 @@ public class AdminParser {
             return;
         }
 
+        // Nettoyage du message reçu depuis le paquet BM
+        raw = raw.trim();
+
+        // Si le message contient encore le séparateur final du paquet
+        if (raw.endsWith("|")) {
+            raw = raw.substring(0, raw.length() - 1).trim();
+        }
+
+        // Si BasicParser a envoyé la commande AVEC le préfixe "."
+        if (raw.startsWith(String.valueOf(PREFIX))) {
+            raw = raw.substring(1).trim();
+        }
+
+        if (raw.isEmpty()) {
+            send(session, "§ Commande vide. Tapez .help");
+            return;
+        }
+        
         String[] parts = raw.trim().split("\\s+", 3);
         String cmd  = parts[0].toLowerCase();
         String arg1 = parts.length > 1 ? parts[1] : "";
@@ -116,7 +134,7 @@ public class AdminParser {
         int online  = WorldData.getCharacters().size();
         long uptime = ServerMetrics.getUptimeSeconds();
         long h = uptime / 3600, m = (uptime % 3600) / 60, s = uptime % 60;
-        send(session, String.format("§ Joueurs : %d | Uptime : %dh%02dm%02ds | RAM : %d Mo",
+        send(session, String.format("§ Joueurs : %d - Uptime : %dh%02dm%02ds - RAM : %d Mo",
             online, h, m, s,
             (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024)));
     }

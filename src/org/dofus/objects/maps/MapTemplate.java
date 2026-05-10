@@ -29,6 +29,7 @@ public class MapTemplate {
     private Map<Integer, Characters>    actors        = new ConcurrentHashMap<>();
     private final Map<Integer, NPC>     npcs          = new ConcurrentHashMap<>();
     private final Map<Integer, MonsterGroup> monsters  = new ConcurrentHashMap<>();
+    private volatile boolean monsterGroupsSpawned = false;
  
     public MapTemplate(int id, byte abscissa, byte ordinate, byte width, byte height, short subarea, String key, String date, boolean subscriberArea, String places) {
         this.id = id;
@@ -127,8 +128,17 @@ public class MapTemplate {
 
 	public Map<Integer, MonsterGroup> getMonsterGroups() { return monsters; }
 
+	public boolean areMonsterGroupsSpawned() { return monsterGroupsSpawned; }
+
+	public void setMonsterGroupsSpawned(boolean monsterGroupsSpawned) {
+		this.monsterGroupsSpawned = monsterGroupsSpawned;
+	}
+
 	public void addMonsterGroup(MonsterGroup group) {
-		monsters.put(group.getId(), group);
+		if(group != null) {
+			group.setCurrentMap(this);
+			monsters.put(group.getId(), group);
+		}
 	}
 
 	public void removeMonsterGroup(MonsterGroup group) {

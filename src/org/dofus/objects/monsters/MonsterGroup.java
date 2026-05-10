@@ -130,19 +130,45 @@ public class MonsterGroup implements IActor {
 
     // ── Sérialisation GM ──────────────────────────────────────────────────────
 
-    /** Entrée GM complète : {@code cell;dir;0;groupId;composition;0;-1;0;0;0;|} */
+    /**
+     * Entrée GM complète SANS le préfixe "GM|+".
+     * Format Ancestra/Dofus 1.29 :
+     * cell;dir;stars;groupId;monsterIds;-3;gfxIds;levels;colors;accessories
+     */
     public String toGMEntry() {
-        StringBuilder comp = new StringBuilder();
+        StringBuilder mobIds = new StringBuilder();
+        StringBuilder mobGfx = new StringBuilder();
+        StringBuilder mobLevels = new StringBuilder();
+        StringBuilder colors = new StringBuilder();
+
         for(MonsterEntry m : members) {
-            if(comp.length() > 0) comp.append(',');
-            comp.append(m.toGMPart());
+            MonsterTemplate tpl = m.getTemplate();
+            MonsterTemplate.MonsterGrade grade = tpl.getGrade(m.getGrade());
+
+            if(mobIds.length() > 0) {
+                mobIds.append(',');
+                mobGfx.append(',');
+                mobLevels.append(',');
+            }
+
+            mobIds.append(tpl.getId());
+            mobGfx.append(tpl.getGfxId()).append("^100"); //TODO GfxId + Taille ^100 normalement y'a une formule avec le level pour determiner la taille
+            mobLevels.append(grade != null ? grade.getLevel() : 1);
+
+            // Pas de couleurs dans le schéma simplifié : -1 = couleur par défaut client.
+            colors.append("-1;-1;-1;");
+            colors.append("0,0,0,0;");
         }
-        return currentCell         + ";"
+
+        return currentCell + ";"
              + orientation.ordinal() + ";"
              + "0;"
-             + groupId             + ";"
-             + comp                + ";"
-             + "0;-1;0;0;0;|";
+             + groupId + ";"
+             + mobIds + ";"
+             + "-3;"
+             + mobGfx + ";"
+             + mobLevels + ";"
+             + colors.toString();
     }
 
     /** Paquet de suppression : {@code GM|-groupId} */

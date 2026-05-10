@@ -4,8 +4,10 @@ import org.dofus.game.actions.RolePlayMovement;
 import org.dofus.network.game.GameClient;
 import org.dofus.network.game.protocols.GProtocol;
 import org.dofus.objects.WorldData;
+import org.dofus.database.objects.MonstersData;
 import org.dofus.objects.actors.Characters;
 import org.dofus.objects.actors.NPC;
+import org.dofus.objects.monsters.MonsterGroup;
 import org.dofus.objects.characters.Statistic;
 import org.dofus.objects.maps.MapTemplate;
 import org.apache.mina.core.session.IoSession;
@@ -54,6 +56,7 @@ public class GameParser {
 
 	//FIXME BOT MOUVEMENT : c'es
 	public static void information(Characters character, IoSession session, GameClient client, MapTemplate map) {
+		MonstersData.spawnAll(map); //FIXME On spawn le groupe de monstre seulement map/map ça va pas... FAUT Chargé toute les maps concernant un groupe de monstre dessus, le reste des map on le garde en lazy-loading
 		if(map.getActor(character.getId()) == null)
 	    	map.addActor(character);
 
@@ -72,6 +75,12 @@ public class GameParser {
 	    for(NPC npc : map.getNpcs().values()) {
 	        allActors.append("|+");
 	        GProtocol.getNpcPattern(allActors, npc);
+	    }
+	    
+	    // 3) Groupes de monstres
+	    for (MonsterGroup group : map.getMonsterGroups().values()) {
+	        allActors.append("|+");
+	        allActors.append(group.toGMEntry());
 	    }
 
 	    session.write(allActors.toString());

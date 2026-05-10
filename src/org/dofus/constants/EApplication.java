@@ -2,7 +2,7 @@ package org.dofus.constants;
 
 public enum EApplication {
 	
-	APPLICATION_VERSION("3.17.37-a"),
+	APPLICATION_VERSION("Dofus 1.29.1 sandbox 3.18.0-alpha.1"),
 	CONFIG_XML_FILE("config.xml"),
 	DEBUG(false),
 	
