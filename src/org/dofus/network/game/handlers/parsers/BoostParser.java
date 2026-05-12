@@ -7,6 +7,7 @@ import org.dofus.objects.characters.Statistic;
 import org.dofus.objects.characters.breeds.Breed.BreedType;
 import org.dofus.utils.DeferredSaveService;
 import org.dofus.utils.PacketValidator;
+import org.dofus.utils.RegenService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +63,7 @@ public class BoostParser {
 		}
 
 		character.setStatsPoint((short) (character.getStatsPoint() - cost));
-		session.write(Statistic.getStatisticsMessage(character));
+		RegenService.refresh(character, session);
 		DeferredSaveService.schedule(character);
 
 		logger.debug("Boost {} stat={} cost={} remaining={}",

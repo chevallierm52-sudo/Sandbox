@@ -145,9 +145,13 @@ public class BankParser {
 
         // Retire du sac
         inv.removeItem(uid, qty);
-        session.write(Inventory.buildORPacket(uid));   // OR si supprimé
-        if(item.getQuantity() > 0)
-            session.write(Inventory.buildOMPacket(item));  // OM si réduit
+        if(inv.getByUid(uid) == null) {
+            session.write(Inventory.buildORPacket(uid));
+            ItemsData.delete(uid);
+        } else {
+            session.write(Inventory.buildOQPacket(item));
+            ItemsData.update(item);
+        }
 
         // Enregistre en banque (BDD) — on réutilise templateId comme proxy
         addBankKamas(character, 0); // force flush du cache (no-op kamas)

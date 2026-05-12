@@ -1,0 +1,506 @@
+packet;categorie;id_message;cle_lang;texte_fr;params_detectes;priorite
+Im00;INFOS;0;INFOS_0;%1;1;
+Im01;INFOS;1;INFOS_1;Tu as récupéré <b>%1</b> points de vie.;1;
+Im02;INFOS;2;INFOS_2;Tu as appris le métier <b>%1</b>.;1;UTILISE_ANCESTRA
+Im03;INFOS;3;INFOS_3;Tu as appris le sort <b>%1</b>.;1;UTILISE_ANCESTRA
+Im04;INFOS;4;INFOS_4;Ton humeur guerrière reprend le dessus. Tu peux être défié...;;
+Im05;INFOS;5;INFOS_5;Tu es maintenant tranquille. On ne peut plus te défier...;;
+Im06;INFOS;6;INFOS_6;Position sauvegardée.;;UTILISE_ANCESTRA
+Im07;INFOS;7;INFOS_7;Tu as récupéré <b>%1</b> points d'énergie.;1;
+Im08;INFOS;8;INFOS_8;Tu as gagné <b>%1</b> points d'expérience.;1;
+Im09;INFOS;9;INFOS_9;Tu as gagné <b>%1</b> points de sagesse.;1;
+Im010;INFOS;10;INFOS_10;Tu as gagné <b>%1</b> points de force.;1;
+Im011;INFOS;11;INFOS_11;Tu as gagné <b>%1</b> points de chance.;1;
+Im012;INFOS;12;INFOS_12;Tu as gagné <b>%1</b> points d'agilité.;1;
+Im013;INFOS;13;INFOS_13;Tu as gagné <b>%1</b> points de vitalité.;1;
+Im014;INFOS;14;INFOS_14;Tu as gagné <b>%1</b> points d' intelligence.;1;
+Im015;INFOS;15;INFOS_15;Tu as gagné <b>%1</b> points de caractéristique.;1;
+Im016;INFOS;16;INFOS_16;Tu as gagné <b>%1</b> points de sort.;1;
+Im017;INFOS;17;INFOS_17;Tu as gagné <b>%1</b> XP dans le métier <b>%2</b>.;1,2;
+Im018;INFOS;18;INFOS_18;%1 vous a mis à la porte de sa maison...;1;UTILISE_ANCESTRA
+Im019;INFOS;19;INFOS_19;%1 avait d'autres clients et a dû vous laisser.;1;
+Im020;INFOS;20;INFOS_20;Tu as dû donner %1 kamas pour pouvoir accéder à ce coffre.;1;UTILISE_ANCESTRA
+Im021;INFOS;21;INFOS_21;Tu as obtenu %1 '<b>%2</b>'.;1,2;UTILISE_ANCESTRA
+Im022;INFOS;22;INFOS_22;Tu as perdu %1 '%2'.;1,2;UTILISE_ANCESTRA
+Im023;INFOS;23;INFOS_23;Tu viens de récupérer %1 points de stats.;1;
+Im024;INFOS;24;INFOS_24;Tu viens de mémoriser un nouveau zaap.;;UTILISE_ANCESTRA
+Im025;INFOS;25;INFOS_25;Votre familier vous fait la fête!;;UTILISE_ANCESTRA
+Im026;INFOS;26;INFOS_26;Vous donnez à manger à votre familier alors qu'il n'avait plus faim. Il se force pour vous faire plaisir;;UTILISE_ANCESTRA
+Im027;INFOS;27;INFOS_27;Vous donnez à manger à répétition à votre familier déjà obèse. Il avale quand même la ressource et fait une indigestion.;;UTILISE_ANCESTRA
+Im028;INFOS;28;INFOS_28;Vous donnez à manger à votre familier tout famélique. Il dévore tout le plus rapidement possible et son estomac en souffre. Mais il reprend du poids.;;
+Im029;INFOS;29;INFOS_29;Vous donnez à manger à votre familier. Il semble qu'il avait très faim.;;UTILISE_ANCESTRA
+Im030;INFOS;30;INFOS_30;Vous donnez à manger à votre gros familier qui se précipite dessus tellement il semble avoir faim. Il mange trop rapidement et se fait mal. Au moins il a maigri un peu;;
+Im031;INFOS;31;INFOS_31;Vous donnez à manger à votre familier famélique qui traînait comme un zombi. Il se force à manger mais la nourriture qu'il avale fait 3 fois son estomac et il se tord de douleur. Au moins il a mangé.;;
+Im032;INFOS;32;INFOS_32;Votre familier apprécie le repas.;;UTILISE_ANCESTRA
+Im033;INFOS;33;INFOS_33;Tu viens de ressusciter, mais ton énergie est encore faible. Prends garde ou les esprits te rattraperont.;;
+Im034;INFOS;34;INFOS_34;Tu as perdu <b>%1</b> points d'énergie.;1;UTILISE_ANCESTRA
+Im036;INFOS;36;INFOS_36;%1 vient de rejoindre le combat en spectateur.;1;UTILISE_ANCESTRA
+Im037;INFOS;37;INFOS_37;Vous êtes désormais considéré comme absent.;;UTILISE_ANCESTRA
+Im038;INFOS;38;INFOS_38;Vous n'êtes plus considéré comme absent.;;UTILISE_ANCESTRA
+Im039;INFOS;39;INFOS_39;<b>%1</b> a activé le mode 'spectateur'.;1;UTILISE_ANCESTRA
+Im040;INFOS;40;INFOS_40;<b>%1</b> a désactivé le mode 'spectateur'.;1;UTILISE_ANCESTRA
+Im042;INFOS;42;INFOS_42;La milice a envoyé du renfort pour aider l'équipe de %1 à se défendre.;1;
+Im043;INFOS;43;INFOS_43;Ton alignement vient d'augmenter de %1 et est désormais de %2.;1,2;
+Im044;INFOS;44;INFOS_44;Ton alignement est désormais de %1.;1;
+Im045;INFOS;45;INFOS_45;Tu as gagné <b>%1</b> kamas.;1;
+Im046;INFOS;46;INFOS_46;Tu as perdu <b>%1</b> kamas.;1;
+Im047;INFOS;47;INFOS_47;Ton mariage avec %1 a été annulé.;1;UTILISE_ANCESTRA
+Im048;INFOS;48;INFOS_48;Le mariage entre %1 et %2 a été annulé.;1,2;UTILISE_ANCESTRA
+Im049;INFOS;49;INFOS_49;En voyant cette porte ainsi illuminée, votre larve dorée s'est précipité pour la franchir, vous n'avez pas pu la suivre. Nul doute qu'elle rejoindra les autres larves maintenant. Une perle dorée gît là où la larve se trouvait quelques secondes auparavent.;;
+Im050;INFOS;50;INFOS_50;Vous êtes maintenant en mode invisible.;;UTILISE_ANCESTRA
+Im051;INFOS;51;INFOS_51;Vous n'êtes plus en mode invisible.;;UTILISE_ANCESTRA
+Im052;INFOS;52;INFOS_52;<b>%1</b> suit votre déplacement.;1;
+Im053;INFOS;53;INFOS_53;<b>%1</b> ne suit plus votre déplacement.;1;
+Im054;INFOS;54;INFOS_54;Nouvelle quête : <b>%1</b>;1;
+Im055;INFOS;55;INFOS_55;Quête mise à jour : <b>%1</b>;1;
+Im056;INFOS;56;INFOS_56;Quête terminée : <b>%1</b>;1;
+Im057;INFOS;57;INFOS_57;Vous ne disposez pas d'assez de kamas pour acquiter la taxe de mise en vente...;;
+Im058;INFOS;58;INFOS_58;Vous ne pouvez pas mettre plus d'objets en vente actuellement...;;UTILISE_ANCESTRA
+Im059;INFOS;59;INFOS_59;Vous ne pouvez pas mettre plus d'objets en vente actuellement...;;
+Im060;INFOS;60;INFOS_60;Cet objet ne peut être accepté ici vu sa rareté...;;
+Im061;INFOS;61;INFOS_61;Cet objet ne fait pas partie des catégories prévues dans cet hôtel de vente.;;
+Im062;INFOS;62;INFOS_62;Action annulée pour cause de surcharge...;;
+Im063;INFOS;63;INFOS_63;Vous ne disposez pas d'assez de kamas pour acheter cet objet.;;
+Im064;INFOS;64;INFOS_64;Cet objet n'est plus disponible à ce prix. Quelqu'un a été plus rapide...;;
+Im065;INFOS;65;INFOS_65;Votre compte en banque a été crédité de <b>%1</b> kamas suite à la vente de <b>%4</b> '<b>%3</b>'.;1,3,4;UTILISE_ANCESTRA
+Im066;INFOS;66;INFOS_66;Votre objet bon marché a été acheté immédiatement par les miliciens qui en feront, bien entendu, très bon usage. Votre compte en banque a été crédité de <b>%1</b> kamas.;1;
+Im067;INFOS;67;INFOS_67;Un de vos objets n'a pas été vendu dans le temps limite. Vous le retrouverez à votre banque.;;
+Im068;INFOS;68;INFOS_68;Lot de <b>%1 '%2'</b> acheté pour <b>%3</b> kamas.;1,2,3;UTILISE_ANCESTRA
+Im069;INFOS;69;INFOS_69;Les autres vous voient maintenant hors ligne...;;
+Im070;INFOS;70;INFOS_70;Les autres vous revoient en ligne à nouveau.;;
+Im071;INFOS;71;INFOS_71;Les autres vous voient maintenant hors ligne, sauf vos amis.;;
+Im072;INFOS;72;INFOS_72;Vous êtes actuellement absent, cette personne risque de ne pas pouvoir vous répondre...;;
+Im073;INFOS;73;INFOS_73;Votre compte en banque a été crédité de <b>%1</b> kamas suite à la vente de <b>%4</b> '<b>%3</b>' lorsque vous étiez hors jeu.;1,3,4;
+Im074;INFOS;74;INFOS_74;Tu as gagné <b>%1</b> points d' honneur.;1;
+Im075;INFOS;75;INFOS_75;Tu as gagné <b>%1</b> points de déshonneur.;1;
+Im076;INFOS;76;INFOS_76;Tu as perdu <b>%1</b> points d' honneur.;1;UTILISE_ANCESTRA
+Im077;INFOS;77;INFOS_77;Tu as perdu <b>%1</b> points de déshonneur.;1;
+Im078;INFOS;78;INFOS_78;Vous avez dû lâcher votre arme à deux mains pour équiper un bouclier.;;
+Im079;INFOS;79;INFOS_79;Vous avez dû lâcher votre bouclier pour équiper une arme à deux mains.;;
+Im080;INFOS;80;INFOS_80;Vous gagnez %1 points d'honneur en récompense de votre bravoure.;1;UTILISE_ANCESTRA
+Im081;INFOS;81;INFOS_81;Vous perdez %1 points d'honneur suite à cette défaite.;1;UTILISE_ANCESTRA
+Im082;INFOS;82;INFOS_82;Votre bravoure vous a fait grimper au rang %1.;1;UTILISE_ANCESTRA
+Im083;INFOS;83;INFOS_83;Vous avez été dégradé au rang %1.;1;UTILISE_ANCESTRA
+Im084;INFOS;84;INFOS_84;Vous êtes sanctionné par %1 point(s) de déshonneur pour ce combat déshonorant;1;UTILISE_ANCESTRA
+Im085;INFOS;85;INFOS_85;Vous rachetez votre déshonneur de %1 point(s) avec cet acte de bravoure.;1;
+Im091;INFOS;91;INFOS_91;Vous avez été téléporté hors d'une zone alignée ennemie...;;
+Im092;INFOS;92;INFOS_92;Vous avez récupéré %1 points d'énergie en vous reposant.;1;
+Im093;INFOS;93;INFOS_93;L'équipe n'accepte désormais que les membres du groupe du personnage principal.;;UTILISE_ANCESTRA
+Im094;INFOS;94;INFOS_94;L'équipe accepte les membres de tous les groupes.;;UTILISE_ANCESTRA
+Im095;INFOS;95;INFOS_95;L'équipe n'accepte plus de personnages supplémentaires.;;UTILISE_ANCESTRA
+Im096;INFOS;96;INFOS_96;L'équipe accepte de nouveau des personnages supplémentaires.;;UTILISE_ANCESTRA
+Im097;INFOS;97;INFOS_97;Les spectateurs seront admis initialement dans vos prochains combats.;;
+Im098;INFOS;98;INFOS_98;Les spectateurs seront refusés initialement dans vos prochains combats.;;
+Im099;INFOS;99;INFOS_99;Vos prochains combats seront joignables uniquement par votre groupe.;;
+Im0100;INFOS;100;INFOS_100;Vos prochains combats ne seront plus joignables uniquement par votre groupe.;;
+Im0101;INFOS;101;INFOS_101;Personne ne sera autorisé à rejoindre vos prochains combats.;;
+Im0102;INFOS;102;INFOS_102;Tout le monde sera autorisé à rejoindre vos prochains combats.;;
+Im0103;INFOS;103;INFOS_103;Demande d'aide signalée...;;UTILISE_ANCESTRA
+Im0104;INFOS;104;INFOS_104;Demande d'aide annulée...;;UTILISE_ANCESTRA
+Im0105;INFOS;105;INFOS_105;Votre monture apprécie le repas.;;
+Im0106;INFOS;106;INFOS_106;Pour utiliser le canal d'alignement vous devez développer vos ailes à 3 ou plus, ou encore avoir choisi une spécialisation par les quêtes d'alignement (niveau de quêtes à partir de 20);;
+Im0107;INFOS;107;INFOS_107;Surveille ton langage, t'es pas un Bwork.;;
+Im0108;INFOS;108;INFOS_108;Avertissement avant sanction.;;
+Im0109;INFOS;109;INFOS_109;Le dieu Sram sème la confusion mentale dans l'esprit du joueur.;;
+Im0110;INFOS;110;INFOS_110;Votre monture%1 a été reprise de l'enclos %2 par %3;1,2,3;
+Im0111;INFOS;111;INFOS_111;Votre monture mâle sauvage%1 s'est enfui aussitôt après avoir fécondé une femelle (enclos en %2).;1,2;
+Im0112;INFOS;112;INFOS_112;Votre monture sauvage femelle%1, aussitôt après avoir mis bas, s'est enfuie.;1;
+Im0113;INFOS;113;INFOS_113;Par respect pour les autres aventuriers, vous décidez après mûre réflexion de ne pas céder à la tentation de participer à la cacophonie d'ordinaire habituelle de ces lieux.;;
+Im0114;INFOS;114;INFOS_114;Impossible d'afficher des objets dans ce canal.;;
+Im0115;INFOS;115;INFOS_115;Ce canal est restreint pour améliorer sa lisibilité. Vous pourrez envoyer un nouveau message dans %1 secondes. Ceci ne vous autorise cependant pas pour autant à surcharger ce canal.;1;UTILISE_ANCESTRA
+Im0116;INFOS;116;INFOS_116;<b>Avertissement</b> : %1;1;
+Im0117;INFOS;117;INFOS_117;Malgré vos talents, la magie n'opère pas et vous sentez l'échec de la transformation, ainsi que la diminution de la puissance de l'objet.;;
+Im0118;INFOS;118;INFOS_118;Vous n'arrivez pas à assembler correctement les ingrédients, et vous n'arrivez pas à concevoir quoi que ce soit d'utilisable cette fois.;;UTILISE_ANCESTRA
+Im0119;INFOS;119;INFOS_119;« Miroir, mon beau miroir ... » Le miroir ne semble pas disposé à répondre à vos préoccupations esthétiques.;;
+Im0120;INFOS;120;INFOS_120;L'horloge indique %1h%2.;1,2;
+Im0121;INFOS;121;INFOS_121;Cette horloge ne semble pas fonctionner.;;
+Im0122;INFOS;122;INFOS_122;Sont-ce les restes d'une beuverie ou des encres d'imprimerie ?;;
+Im0123;INFOS;123;INFOS_123;Vous créez : °0;;
+Im0124;INFOS;124;INFOS_124;Une pensée vous vient à l'esprit : « Quel beau portrait de ma grand tante Danielle ! ... »;;
+Im0125;INFOS;125;INFOS_125;« coco ? »;;
+Im0126;INFOS;126;INFOS_126;« Il est exactement %1h%2. Coco »;1,2;
+Im0127;INFOS;127;INFOS_127;Cette horloge n'est pas à l'heure, elle indique %1h%2.;1,2;
+Im0128;INFOS;128;INFOS_128;« Vous a-t-on déjà dit que vous ressembliez à %1 ? » s'enquit le miroir.;1;
+Im0129;INFOS;129;INFOS_129;« Je détiens la force toute puissante! »;;
+Im0130;INFOS;130;INFOS_130;« Savez-vous planter les choux ... »;;
+Im0131;INFOS;131;INFOS_131;« Ci-gît Hector, niveau 197, tué par le cri d'un Tofu affamé. »;;
+Im0132;INFOS;132;INFOS_132;« Attention ! Peinture fraîche »;;
+Im0133;INFOS;133;INFOS_133;« PIOU PIOU »;;
+Im0134;INFOS;134;INFOS_134;Cet oiseau empaillé, rembourré à la fleur de chanvre, sent bon le bwork malade.;;
+Im0135;INFOS;135;INFOS_135;Vous vous réchauffez au coin du poêle. Il fait bon dans la pièce.;;
+Im0136;INFOS;136;INFOS_136;Le poêle est éteint.;;
+Im0137;INFOS;137;INFOS_137;Cet oiseau n'a pas l'air en forme, il vaudrait mieux l'achever d'un bon coup d'épée ...;;
+Im0138;INFOS;138;INFOS_138;Le piou se jette sur vous et vous arrache les yeux ...\nAh non, c'est une illusion, quelqu'un vous en veut ...;;
+Im0139;INFOS;139;INFOS_139;Vous ne pouvez plus parler dans ce canal, seuls les débutants présents dans Incarnam le peuvent. Vous pouvez néanmoins leur répondre en message privé pour les aider.;;
+Im0140;INFOS;140;INFOS_140;Un tofu peinturluré s'échappe du tableau et vous attaque.;;
+Im0141;INFOS;141;INFOS_141;Le tofu collé à la toile par la peinture semble vouloir se détacher du tableau.;;
+Im0142;INFOS;142;INFOS_142;Le tofu est maintenant bien fixé ! Marylork est un vrai artiste réaliste.;;
+Im0143;INFOS;143;INFOS_143;%1 est en ligne.;1;
+Im0144;INFOS;144;INFOS_144;Votre inventaire est plein. Votre récolte est perdue...;;
+Im0145;INFOS;145;INFOS_145;Vous faites halte devant cette œuvre de magnificence, et l'ayant admiré en votre cœur, vous vous exclamez avec enthousiasme : « Voilà donc le héros d'endurance qui, des épreuves des dieux, a su triompher. Voici donc le visage de ce guerrier légendaire qui sous l'égide de Féca atteignit le pinacle du firmament ». Puis, pour pondérer votre envolée lyrique, vous ajoutez : « Rhô ke c bo, il r0xX ! ».;;
+Im0146;INFOS;146;INFOS_146;Que je suis beau !;;
+Im0147;INFOS;147;INFOS_147;Après vérification de ses registres, un gardien d'étable vous annonce, qu'il a libéré la monture dénommée « %1 » que vous lui aviez confié.\nIl était, en effet, sans nouvelles de vous ou de son nouveau propriétaire dans les délais fixés lors de l'échange.;1;
+Im0148;INFOS;148;INFOS_148;Les ailes sanglantes de Sacrieur, la Déesse des Martyrs, s'ouvrent devant vos yeux ébahis.\nCette statue apparut lors de l'avènement de la Déesse, générée par les pensées réunies de milliers de fidèles.;;
+Im0149;INFOS;149;INFOS_149;Cette armure ancienne semble cacher les restes d'un passage secret qui a dû s'écrouler il y a bien longtemps.\nPeut-être qu'avec une pelle, une pioche, et beaucoup de courage... Hm, après réflexion, en fait non.;;
+Im0150;INFOS;150;INFOS_150;De la main de <b>%2</b>, <b>%1</b> dit : %3;1,2,3;
+Im0151;INFOS;151;INFOS_151;Votre <b>%1</b> vous murmure : %2;1,2;
+Im0152;INFOS;152;INFOS_152;Précédente connexion sur votre compte effectuée le %3/%2/%1 à %4:%5 via l'adresse IP %6;1,2,3,4,5,6;UTILISE_ANCESTRA
+Im0153;INFOS;153;INFOS_153;Votre adresse IP actuelle est %1.;1;UTILISE_ANCESTRA
+Im0154;INFOS;154;INFOS_154;Tu as oublié un sort de niveau %1 et tu as regagné %2 points de sort.;1,2;
+Im0155;INFOS;155;INFOS_155;Votre présence dans ce territoire ne vous a pas procuré d'honneur cette fois, vous aviez déjà vaillamment défendu il y a peu. Le prochain combat sera sans doute plus valorisant !;;
+Im0156;INFOS;156;INFOS_156;La porte du tribunal est fermée à clef.;;
+Im0157;INFOS;157;INFOS_157;Ce canal n'est accessible en diffusion aux abonnés qu'à partir du niveau %1.;1;
+Im0158;INFOS;158;INFOS_158;Votre dragodinde %1 a été déplacée dans votre étable suite à la vente de l'enclos dans lequel elle se trouvait.;1;
+Im0159;INFOS;159;INFOS_159;Votre arme ne peut contenir autant de runes ! Toutes les runes vous ont été rendues.;;
+Im0160;INFOS;160;INFOS_160;Sanctuaire Hotomani;;
+Im0161;INFOS;161;INFOS_161;Une force invisible vous empêche de passer;;
+Im0162;INFOS;162;INFOS_162;Plus que <b>%2</b> tour(s) avant la déconnexion de <b>%1</b>;1,2;
+Im0163;INFOS;163;INFOS_163;<b>%1</b> a visé le mur.;1;
+Im0164;INFOS;164;INFOS_164;Vous vous regardez dans le miroir, vous êtes moche.;;
+Im0165;INFOS;165;INFOS_165;Nouveau challenge : %1 !;1;
+Im0166;INFOS;166;INFOS_166;Challenge échoué !;;
+Im0167;INFOS;167;INFOS_167;Challenge réussi !;;
+Im0168;INFOS;168;INFOS_168;Message automatique : Le joueur <b>%1</b> a été rendu muet pour ne pas avoir respecté les règles. <b>%1</b> ne pourra pas vous répondre avant <b>%2</b> minutes.;1,2;
+Im0169;INFOS;169;INFOS_169;(...) Riyou Tchevlakouk, citoyen bénévole de Bonta, est en charge du dressage des crocs glands, au bâtiment annexe à l'hôtel de vente des animaux.;;
+Im0170;INFOS;170;INFOS_170;En montant sur le bâtiment vous apercevez un milicien bontarien se dirigeant vers Astrub.;;
+Im0171;INFOS;171;INFOS_171;Vous trouvez des traces de lutte et des restes de Karne.;;
+Im0172;INFOS;172;INFOS_172;Cette porte est verrouillée. Impossible de la forcer.;;
+Im0173;INFOS;173;INFOS_173;Vous ne pouvez pas dérober le document tant que le garde vous surveille.;;
+Im0174;INFOS;174;INFOS_174;Il vous faut un Tonneau en Bombu pour transporter l'hydre au miel.;;
+Im0175;INFOS;175;INFOS_175;Contrat rempli ! Retournez auprès de votre commanditaire.;;
+Im0176;INFOS;176;INFOS_176;Tu as quitté ta guilde;;
+Im0177;INFOS;177;INFOS_177;Tu as banni <b>%1</b> de ta guilde.;1;
+Im0178;INFOS;178;INFOS_178;Tous les membres du groupe suivent vos déplacements.;;
+Im0179;INFOS;179;INFOS_179;Contrat échoué ! Retournez auprès de votre commanditaire.;;
+Im0180;INFOS;180;INFOS_180;Vous avez survécu au chasseur de tête <b>%1</b> !;1;
+Im0181;INFOS;181;INFOS_181;Votre monture %1 a été retirée de l'enclos %2 par %3 et mise dans votre étable.;1,2,3;
+Im0182;INFOS;182;INFOS_182;Le message au joueur <b>%1</b> est en cours d'envoi via son accès mobile...;1;
+Im0183;INFOS;183;INFOS_183;Malgré vos talents, la magie n'opère pas et vous sentez l'échec de la transformation.;;UTILISE_ANCESTRA
+Im0184;INFOS;184;INFOS_184;Vous avez placé la monture %1 dans l'enclos de son propriétaire.;1;
+Im0185;INFOS;185;INFOS_185;Au milieu des armes est rangé le manuscrit de la chanson Je sais que tu combats composée et interprétée par le ménestrel Francisque Kabroule lors de la cérémonie d'ouverture de l'arène.;;
+Im0186;INFOS;186;INFOS_186;Vous avez été expulsé du village suite à sa capture par vos ennemis.;;
+Im0187;INFOS;187;INFOS_187;Suite à la capture du village par vos ennemis, vous en serez expulsé à la fin du combat.;;
+Im0188;INFOS;188;INFOS_188;Et comme d'habitude, c'est à <b>%1</b> que l'on doit cet exploit...;1;UTILISE_ANCESTRA
+Im0189;INFOS;189;INFOS_189;[wait_mod_Br8190] Des jets de lave jaillissent, bloquant votre avancée.;;
+Im0190;INFOS;190;INFOS_190;[wait_mod_Bo8190] Un combat a eu lieu ici. Vous devriez interroger le voisinage pour en savoir plus.;;
+Im0191;INFOS;191;INFOS_191;[wait_mod_Bo9100] La statuette semble n'avoir aucun effet, vous l'avez sans doute cassée. C'est Jiva qui va être fâchée.;;
+Im0192;INFOS;192;INFOS_192;Un champ de force magique vous empêche de passer.;;
+Im0193;INFOS;193;INFOS_193;[WIP] Précédente connexion sur votre compte effectuée le %3/%2/%1 à %4:%5;1,2,3,4,5;
+Im0194;INFOS;194;INFOS_194;La magie n'a pas parfaitement fonctionné, une des caractéristiques de l'objet a baissé en puissance.;;
+Im0195;INFOS;195;INFOS_195;Ledrob Terceséc vous surveillant, il vaut mieux éviter de fouiller dans ses affaires.;;
+Im0196;INFOS;196;INFOS_196;[Wip] Réservé pour Dofus 2;;
+Im0197;INFOS;197;INFOS_197;[Wip] Réservé pour Dofus 2;;
+Im0198;INFOS;198;INFOS_198;[wait_mod_Br6170] Un Bontarien interrompt vos recherches.;;
+Im0199;INFOS;199;INFOS_199;[wait_mod_Br6170] Le buisson est vide. Les branches cassées indique que quelqu'un a profité de votre combat pour dérober ce qui était caché ici. Oto Mustam va être mécontent.;;
+Im0200;INFOS;200;INFOS_200;Quelque chose de puissant est passé par ici, mais le portail est maintenant refermé.;;
+Im0201;INFOS;201;INFOS_201;En application du décret contre les mutants de l'officier Kelly, l'accès à l'arène est interdit aux mutants.;;
+Im0202;INFOS;202;INFOS_202;Tes caractéristiques ne conviennent pas;;
+Im0203;INFOS;203;INFOS_203;Tu n'as pas le niveau nécessaire.;;
+Im0204;INFOS;204;INFOS_204;Tu n'exerces pas le métier nécessaire.;;
+Im0205;INFOS;205;INFOS_205;Avant d'entrer, vous consommez la potion et ressentez comme une chaleur enveloppant votre corps. Les effets de la salle ne vous affectent plus.;;
+Im0206;INFOS;206;INFOS_206;Vous pénétrez, non sans peine, dans l'antre du maître des lieux et vous vous sentez fatigué.;;
+Im0207;INFOS;207;INFOS_207;Vous lancez votre dé... *roulement de tambour*;;
+Im0208;INFOS;208;INFOS_208;Quelqu'un vous traquait et vous a fait sortir de force de la maison;;
+Im0209;INFOS;209;INFOS_209;Ta guilde a gagné <b>%1</b> points d'expérience.;1;
+Im0210;INFOS;210;INFOS_210;Ta monture a gagné <b>%1</b> points d'expérience.;1;
+Im0211;INFOS;211;INFOS_211;Ton Coffre Animé a participé au butin.;;
+Im0212;INFOS;212;INFOS_212;[TR2];;
+Im0220;INFOS;220;INFOS_220;<b>%1</b> a progressé de <b>%2,%3</b>%.;1,2,3;
+Im0221;INFOS;221;INFOS_221;<b>%1</b> a atteint le seuil de chargement maximum !;1;
+Im0222;INFOS;222;INFOS_222;Votre réponse a été enregistré.;;
+Im0226;INFOS;226;INFOS_226;Impossible de rejoindre, le mode spectateur a été désactivé par <b>%1</b>.;1;
+Im0227;INFOS;227;INFOS_227;<b>%1</b> a lancé un combat en <b>%2</b>.;1,2;
+Im0228;INFOS;228;INFOS_228;Une tenue acceptable est demandée dans cette arène, merci de nettoyer tout ce rose.;;
+Im0229;INFOS;229;INFOS_229;L'accès à l'arène n'est pas autorisé si vous êtes en outrageusement en quête d'amour.;;
+Im0230;INFOS;230;INFOS_230;Vos efforts ont été reconnus par le clan Mercenaire : vous recevez une prime.;;
+Im0231;INFOS;231;INFOS_231;Vos efforts ont été reconnus par le clan Mercenaire : vous recevez une <b>grande</b> prime.;;
+Im10;ERROR;0;ERROR_0;%1;1;
+Im11;ERROR;1;ERROR_1;Certaines conditions ne sont pas satisfaites;;
+Im12;ERROR;2;ERROR_2;Tu n'exerces pas le métier nécessaire;;UTILISE_ANCESTRA
+Im13;ERROR;3;ERROR_3;Tu n'as pas le niveau nécessaire;;
+Im14;ERROR;4;ERROR_4;Tu ne possèdes pas l'objet nécessaire;;UTILISE_ANCESTRA
+Im15;ERROR;5;ERROR_5;Tu n'appartiens pas à la bonne classe;;
+Im16;ERROR;6;ERROR_6;Impossible d'apprendre le métier %1.;1;
+Im17;ERROR;7;ERROR_7;Impossible d'apprendre le sort %1.;1;
+Im18;ERROR;8;ERROR_8;Il faut être au moins niveau %1 dans tous ses métiers pour en apprendre un autre.;1;
+Im19;ERROR;9;ERROR_9;Tu connais déjà suffisamment de métiers.;;UTILISE_ANCESTRA
+Im110;ERROR;10;ERROR_10;Ton inventaire est plein, impossible d'y ajouter d'autres objets.;;
+Im111;ERROR;11;ERROR_11;Tu as déjà appris ce métier.;;UTILISE_ANCESTRA
+Im112;ERROR;12;ERROR_12;Tu es trop chargé. Jette quelques objets pour pouvoir bouger...;;UTILISE_ANCESTRA
+Im113;ERROR;13;ERROR_13;Cette action n'est pas autorisée sur cette carte.;;UTILISE_ANCESTRA
+Im114;ERROR;14;ERROR_14;Le joueur %1 était absent et n'a donc pas reçu votre message.;1;UTILISE_ANCESTRA
+Im115;ERROR;15;ERROR_15;Pour des raisons de maintenances, le serveur va être redémarré dans %1.;1;UTILISE_ANCESTRA
+Im116;ERROR;16;ERROR_16;%1 : %2;1,2;
+Im117;ERROR;17;ERROR_17;%1 vous a rendu muet pour %2 minute(s).;1,2;
+Im118;ERROR;18;ERROR_18;L'heure actuelle ne convient pas.;;
+Im119;ERROR;19;ERROR_19;Tes caractéristiques ne conviennent pas;;UTILISE_ANCESTRA
+Im120;ERROR;20;ERROR_20;Cet emplacement de stockage est déjà utilisé.;;
+Im121;ERROR;21;ERROR_21;Action impossible car ton abonnement a expiré.;;
+Im122;ERROR;22;ERROR_22;Le joueur %1 n'est pas abonné. Action impossible...;1;
+Im123;ERROR;23;ERROR_23;Impossible de devenir marchand : tu n'as aucun objet à vendre...;;UTILISE_ANCESTRA
+Im124;ERROR;24;ERROR_24;Vous ne pouvez devenir vendeur que sur une case vide.;;
+Im125;ERROR;25;ERROR_25;Impossible : il ne peut y avoir plus de %1 vendeurs sur cette carte.;1;UTILISE_ANCESTRA
+Im126;ERROR;26;ERROR_26;Impossible de se téléporter dans une maison verrouillée.;;
+Im127;ERROR;27;ERROR_27;Action impossible car ta période d'essai est terminée.;;
+Im128;ERROR;28;ERROR_28;<b>En attente du joueur %1...</b>;1;
+Im129;ERROR;29;ERROR_29;<b>En attente des joueurs %1...</b>;1;
+Im130;ERROR;30;ERROR_30;<b>Perte de la connexion : le joueur %1 a été exclu de la partie</b>;1;
+Im131;ERROR;31;ERROR_31;Cette action nécessite un abonnement valide.;;
+Im132;ERROR;32;ERROR_32;Tu ne peux pas avoir plus de %1 maison(s).;1;UTILISE_ANCESTRA
+Im133;ERROR;33;ERROR_33;Impossible d'agresser un joueur de si faible niveau.;;
+Im134;ERROR;34;ERROR_34;Certaines conditions ne sont pas satisfaites.;;
+Im135;ERROR;35;ERROR_35;Etre marié ou ne pas l'être... Tu sembles ne pas avoir fait le bon choix.;;
+Im136;ERROR;36;ERROR_36;Ton épouse n'est pas connectée.;;
+Im137;ERROR;37;ERROR_37;Ton mari n'est pas connecté.;;
+Im138;ERROR;38;ERROR_38;Tu n'es pas marié(e).;;
+Im139;ERROR;39;ERROR_39;Ton épouse n'est pas disponible pour l'instant...;;UTILISE_ANCESTRA
+Im140;ERROR;40;ERROR_40;Ton époux n'est pas disponible pour l'instant...;;UTILISE_ANCESTRA
+Im141;ERROR;41;ERROR_41;Il n'y a pas de place disponible près de ton épouse.;;UTILISE_ANCESTRA
+Im142;ERROR;42;ERROR_42;Il n'y a pas de place disponible près de ton époux.;;UTILISE_ANCESTRA
+Im143;ERROR;43;ERROR_43;pour utiliser '%1'.;1;
+Im144;ERROR;44;ERROR_44;pour équiper '%1'.;1;
+Im145;ERROR;45;ERROR_45;pour rentrer ici.;;
+Im146;ERROR;46;ERROR_46;Tu n'exerces pas le métier %1.;1;
+Im147;ERROR;47;ERROR_47;Ton niveau est trop faible pour prendre part à une agression.;;
+Im148;ERROR;48;ERROR_48;Vous étiez au mauvais endroit, au mauvais moment, et votre corps à été réduit en charpie.;;
+Im149;ERROR;49;ERROR_49;Impossible de désapprendre le métier <b>%1</b>.;1;
+Im150;ERROR;50;ERROR_50;Vous aviez oublié votre familier, il a dû trouver à manger tout seul. Mais son état laisse à penser qu'il n'a pas très bien réussi.;;
+Im151;ERROR;51;ERROR_51;Vous aviez oublié votre familier, il est trop gros pour chasser tout seul et à dû se résigner à manger ce qui traînait. Il a perdu du poids mais aussi de sa puissance.;;
+Im152;ERROR;52;ERROR_52;Vous aviez oublié votre familier qui était déjà trop maigre. Il a tenté de manger quelque chose qui traînait mais sans grand succès. Il est maintenant au plus mal.;;
+Im153;ERROR;53;ERROR_53;Votre familier prend la ressource, la renifle un peu, ne semble pas convaincu et vous la rend.;;UTILISE_ANCESTRA
+Im154;ERROR;54;ERROR_54;Vous n'avez pas assez fait attention à votre familier. Il s'est transformé en fantôme !;;UTILISE_ANCESTRA
+Im155;ERROR;55;ERROR_55;Le niveau de ta guilde ne te permet pas d'avoir plus de %1 membres.;1;UTILISE_ANCESTRA
+Im156;ERROR;56;ERROR_56;Il est trop tard;;
+Im157;ERROR;57;ERROR_57;Impossible de rejoindre ce combat en mode 'Spectateur'.;;UTILISE_ANCESTRA
+Im158;ERROR;58;ERROR_58;Vérifie les Emote que tu connais déjà, et réessaye...;;
+Im159;ERROR;59;ERROR_59;Votre apparence ne vous permet pas d'exécuter cette action;;
+Im160;ERROR;60;ERROR_60;<b>%1</b> vient de se dématérialiser entre vos mains.;1;
+Im161;ERROR;61;ERROR_61;Il faut posséder une maison pour utiliser cet objet.;;
+Im162;ERROR;62;ERROR_62;"Action impossible avec un compte non abonné. <font color="" + """""" + ""#0000FF"" + """""" + ""><u><a href='asfunction:onHref,OpenPayZoneDetails'>Comment devenir membre de la communauté ?</a></u></font>";;
+Im163;ERROR;63;ERROR_63;Action impossible car votre interlocuteur est trop chargé.;;
+Im164;ERROR;64;ERROR_64;Cet objet ne fait pas partie des catégories prévues dans cet hôtel de vente.;;
+Im165;ERROR;65;ERROR_65;Vous ne disposez pas d'assez de kamas pour acquitter la taxe de mise en vente...;;
+Im166;ERROR;66;ERROR_66;Vous ne pouvez pas mettre plus d'objets en vente actuellement...;;
+Im167;ERROR;67;ERROR_67;Vous ne pouvez pas mettre plus d'objets en vente actuellement...;;
+Im168;ERROR;68;ERROR_68;Cet objet ne peut être accepté ici vu sa rareté...;;
+Im170;ERROR;70;ERROR_70;Action annulée pour cause de surcharge...;;
+Im171;ERROR;71;ERROR_71;Vous ne disposez pas d'assez de kamas pour acheter cet objet.;;
+Im172;ERROR;72;ERROR_72;Cet objet n'est plus disponible à ce prix. Quelqu'un a été plus rapide...;;UTILISE_ANCESTRA
+Im174;ERROR;74;ERROR_74;Action annulée. Désolé, l'hôtel des ventes est clos temporairement.  Revenez un peu plus tard !!;;
+Im175;ERROR;75;ERROR_75;pour débuter cette quête.;;
+Im176;ERROR;76;ERROR_76;Vous n'avez pas assez de kamas pour acquitter la taxe de mise en mode marchand...;;UTILISE_ANCESTRA
+Im177;ERROR;77;ERROR_77;Cette personne est déjà alignée.;;
+Im178;ERROR;78;ERROR_78;Votre état et celui de votre mari ne vous permet pas de le rejoindre actuellement.;;UTILISE_ANCESTRA
+Im179;ERROR;79;ERROR_79;Votre état et celui de votre femme ne vous permet pas de la rejoindre actuellement.;;UTILISE_ANCESTRA
+Im180;ERROR;80;ERROR_80;Votre mari est trop éloigné pour vous permettre de le rejoindre.;;
+Im181;ERROR;81;ERROR_81;Votre femme est trop éloignée pour vous permettre de la rejoindre.;;
+Im182;ERROR;82;ERROR_82;Vous n'avez pas assez de kamas pour effectuer cette action.;;UTILISE_ANCESTRA
+Im183;ERROR;83;ERROR_83;Votre déshonneur ne vous permet pas de faire cette action.;;UTILISE_ANCESTRA
+Im184;ERROR;84;ERROR_84;Votre message n'a pas abouti car identique au précédent message.;;
+Im185;ERROR;85;ERROR_85;Vous devez équiper votre outil pour cette action.;;
+Im186;ERROR;86;ERROR_86;Impossible de ressusciter une personne d'une cité ennemie.;;
+Im187;ERROR;87;ERROR_87;L'abonnement lié au cadeau a été invalidé. L'objet est donc repris.;;
+Im188;ERROR;88;ERROR_88;Votre familier ne peut vous suivre tant que vous êtes sur votre monture...;;
+Im189;ERROR;89;ERROR_89;Bienvenue sur DOFUS Retro, dans le Monde des Douze !\nRappel : prenez garde, il est interdit de transmettre votre identifiant de connexion ainsi que votre mot de passe.;;UTILISE_ANCESTRA
+Im190;ERROR;90;ERROR_90;Votre monture semble ne pas vouloir avaler cette nourriture...;;
+Im191;ERROR;91;ERROR_91;Action impossible en cours de combat.;;UTILISE_ANCESTRA
+Im192;ERROR;92;ERROR_92;Impossible de modifier la structure des enclos publics.;;
+Im193;ERROR;93;ERROR_93;Impossible de modifier la structure d'un enclos qui ne vous appartient pas.;;
+Im194;ERROR;94;ERROR_94;Impossible de vendre un enclos public.;;UTILISE_ANCESTRA
+Im195;ERROR;95;ERROR_95;Impossible de vendre un enclos qui ne vous appartient pas.;;UTILISE_ANCESTRA
+Im196;ERROR;96;ERROR_96;Impossible d'acheter un enclos public.;;UTILISE_ANCESTRA
+Im197;ERROR;97;ERROR_97;Impossible d'acheter un enclos non en vente.;;UTILISE_ANCESTRA
+Im198;ERROR;98;ERROR_98;Seul le meneur de la guilde peut acheter des enclos.;;UTILISE_ANCESTRA
+Im199;ERROR;99;ERROR_99;Prix invalide.;;
+Im1100;ERROR;100;ERROR_100;Vous n'appartenez pas à la bonne guilde pour profiter de cet enclos.;;
+Im1101;ERROR;101;ERROR_101;Vous ne disposez pas des droits de guildes suffisants pour cette opération.;;UTILISE_ANCESTRA
+Im1102;ERROR;102;ERROR_102;Cellule cible invalide.;;UTILISE_ANCESTRA
+Im1103;ERROR;103;ERROR_103;Impossible d'acheter un enclos supplémentaire. Une guilde peut acquérir un enclos après son niveau 10, puis un supplémentaire par tranche de 10 niveaux. Il faut en outre que la guilde soit agée de plus de 2 mois.;;UTILISE_ANCESTRA
+Im1104;ERROR;104;ERROR_104;Monture désignée invalide.;;
+Im1105;ERROR;105;ERROR_105;L'étable est pleine. Vous ne pouvez conserver que 100 montures maximum.;;
+Im1106;ERROR;106;ERROR_106;Votre inventaire de monture doit être vide pour pouvoir la déséquiper.;;
+Im1107;ERROR;107;ERROR_107;L'enclos est plein pour le moment.;;
+Im1108;ERROR;108;ERROR_108;Cette monture n'est plus disponible. Elle a dû s'enfuir. Les certificats ne permettent de conserver une monture qu'un temps limité.;;
+Im1109;ERROR;109;ERROR_109;Attention ! Bavasser comme un Porkass est mal vu des autres aventuriers.;;
+Im1110;ERROR;110;ERROR_110;A peine entrée dans l'étable, votre monture s'accroupit et commence à mettre bas. Après quelques instants, vous pouvez constater que tout s'est bien passé. Vous voilà responsable d'une nouvelle monture.;;
+Im1111;ERROR;111;ERROR_111;A peine entrée dans l'étable, votre monture s'accroupit et commence à mettre bas. Après quelques instants, vous pouvez constater que tout s'est bien passé. Vous voilà responsable de %1 nouvelles montures.;1;
+Im1112;ERROR;112;ERROR_112;Votre monture semble souffrir, et commence à mettre bas sa progéniture. Hélas, vous avez trop tardé à venir l'accompagner dans son travail, et son petit ne survit pas.;;
+Im1113;ERROR;113;ERROR_113;Impossible de monter sur votre monture, elle est épuisée... Nourrissez-la, ou laissez-la se reposer dans un enclos.;;
+Im1114;ERROR;114;ERROR_114;Votre monture, épuisée, refuse de vous porter plus loin.;;
+Im1115;ERROR;115;ERROR_115;Seuls les comptes abonnés peuvent profiter des montures.;;
+Im1116;ERROR;116;ERROR_116;Impossible dans votre état actuel.;;
+Im1117;ERROR;117;ERROR_117;Impossible d'être sur une monture à l'intérieur d'une maison.;;
+Im1118;ERROR;118;ERROR_118;Impossible d'entrer dans une demeure en restant sur sa monture.;;
+Im1119;ERROR;119;ERROR_119;Impossible d'acheter un enclos sans avoir de monture.;;
+Im1120;ERROR;120;ERROR_120;Impossible d'interagir avec votre percepteur sur la carte même où vous vous êtes connecté.;;
+Im1121;ERROR;121;ERROR_121;Avertissement avant sanction.;;
+Im1122;ERROR;122;ERROR_122;L'abus de points d'exclamations est dangereux pour la santé !!!;;
+Im1123;ERROR;123;ERROR_123;Le principe de précaution vous a rendu muet pour %1 seconde(s).;1;
+Im1124;ERROR;124;ERROR_124;A force de trop parler, vous en avez perdu la voix. Vous devriez vous taire pendant les %1 prochaines secondes.;1;UTILISE_ANCESTRA
+Im1125;ERROR;125;ERROR_125;Le gardien de l'enclos a perdu trace de votre monture. Il vous propose en échange une même monture, mais qui vient de naître. C'est toujours mieux que rien...;;
+Im1126;ERROR;126;ERROR_126;Tu n'as pas les droits nécessaires;;
+Im1127;ERROR;127;ERROR_127;Incarnam ne vous est plus accessible désormais, votre expérience fait de vous un aventurier apte à parcourir le monde sans continuer dans cette zone...;;UTILISE_ANCESTRA
+Im1128;ERROR;128;ERROR_128;Le montant de la transaction s'élève à %1 kamas. Malheureusement vous n'avez actuellement pas cette somme sur vous.;1;
+Im1129;ERROR;129;ERROR_129;Vous ne pouvez pas poser ceci au sol.;;
+Im1130;ERROR;130;ERROR_130;Vous ne pouvez pas atteindre cet endroit depuis votre position actuelle.;;
+Im1131;ERROR;131;ERROR_131;Il faut être abonné;;
+Im1132;ERROR;132;ERROR_132;Il est interdit d'attaquer ceci pendant encore %1 minute(s).;1;
+Im1133;ERROR;133;ERROR_133;Il est trop tôt;;
+Im1134;ERROR;134;ERROR_134;Ce n'est pas le bon moment;;
+Im1135;ERROR;135;ERROR_135;Vous devez appartenir à une guilde pour profiter de cette possibilité.;;UTILISE_ANCESTRA
+Im1136;ERROR;136;ERROR_136;La téléportation vers cette maison de guilde n'a pas été autorisée par son propriétaire.;;UTILISE_ANCESTRA
+Im1137;ERROR;137;ERROR_137;Vous êtes à court de potion de foyer de guilde.;;UTILISE_ANCESTRA
+Im1138;ERROR;138;ERROR_138;Votre percepteur est de mauvaise humeur, pour pouvoir récolter son butin revenez plus tard (%1h).;1;
+Im1139;ERROR;139;ERROR_139;Attention, la fenêtre d'échange se fermera automatiquement dans %1 minutes.;1;
+Im1140;ERROR;140;ERROR_140;La destination est en territoire hostile.;;
+Im1141;ERROR;141;ERROR_141;La téléportation vers cette zone n'est pas autorisée aux joueurs neutres.;;
+Im1142;ERROR;142;ERROR_142;Les tombes sont interdites en donjon, vous avez été ramené à votre dernier point de sauvegarde.;;
+Im1143;ERROR;143;ERROR_143;Vous ne pouvez plus accéder à ce prisme.;;
+Im1144;ERROR;144;ERROR_144;Vous avez besoin de vos ailes pour voler jusqu'à un autre prisme.;;
+Im1145;ERROR;145;ERROR_145;Il n'y a pas assez de place ici.;;UTILISE_ANCESTRA
+Im1146;ERROR;146;ERROR_146;Vous ne pouvez pas poser de prisme sur cette carte.;;
+Im1147;ERROR;147;ERROR_147;Vous ne pouvez pas poser de prisme dans cette zone.;;
+Im1148;ERROR;148;ERROR_148;Pour poser un prisme il vous faut au préalable parader ostensiblement avec vos jolies ailes, tel un paon, pendant une période de 5 minutes.;;
+Im1149;ERROR;149;ERROR_149;Il y a déjà un prisme dans cette zone.;;
+Im1150;ERROR;150;ERROR_150;Vous ne pouvez pas dissimuler vos ailes en ce lieu.;;
+Im1151;ERROR;151;ERROR_151;Impossible d'acheter une maison supplémentaire. Une guilde peut partager une maison après son niveau 10, puis une supplémentaire par tranche de 10 niveaux. Il faut en outre que la guilde soit agée de plus de 2 mois.;;
+Im1152;ERROR;152;ERROR_152;Vous ne pouvez pas poser de prisme dans cette zone : vous ne possédez pas assez de territoires de base.;;
+Im1153;ERROR;153;ERROR_153;Vous ne pouvez pas poser de prisme dans cette zone : il reste trop d'ennemis. Pourchassez les ennemis encore présents pour que la balance du territoire vous soit favorable.;;
+Im1154;ERROR;154;ERROR_154;Vous ne pouvez pas attaquer ce prisme durant sa première heure de vie.;;
+Im1155;ERROR;155;ERROR_155;Vous devez être au minimum niveau 10 et de grade 3 pour poser un prisme.;;
+Im1156;ERROR;156;ERROR_156;Vous ne pouvez prendre la place que d'un joueur ayant un grade inférieur au vôtre. Les plus haut gradés sont prioritaires !;;
+Im1157;ERROR;157;ERROR_157;Vous ne pouvez pas attaquer ce prisme, vos territoires sont trop éloignés pour permettre une percée dans cette zone.;;
+Im1158;ERROR;158;ERROR_158;Seuls les téméraires triomphant d'une quête précise sont bienvenus;;
+Im1159;ERROR;159;ERROR_159;Vous êtes à court de potion d'enclos de guilde.;;UTILISE_ANCESTRA
+Im1160;ERROR;160;ERROR_160;Vous ne pouvez pas attaquer ce prisme dans cette zone : trop d'ennemis sont présents. Pourchassez les ennemis encore présents ou attaquez dans une zone moins peuplée pour que la balance du territoire vous soit favorable.;;
+Im1161;ERROR;161;ERROR_161;Vous ne pouvez pas équiper un objet vivant directement, essayez plutôt de l'associer sur un objet équipé qu'il affectionne.;;
+Im1162;ERROR;162;ERROR_162;Vous ne pouvez pas associer un objet vivant à un objet inanimé non échangeable.;;
+Im1163;ERROR;163;ERROR_163;Votre objet vivant n'a pas l'air de vouloir ingurgiter quoi que ce soit pour le moment.;;
+Im1164;ERROR;164;ERROR_164;Une sauvegarde du serveur est en cours... Vous pouvez continuer de jouer, mais l'accès au serveur est temporairement bloqué. La connexion sera de nouveau possible d'ici quelques instants. Merci de votre patience.;;UTILISE_ANCESTRA
+Im1165;ERROR;165;ERROR_165;La sauvegarde du serveur est terminée. L'accès au serveur est de nouveau possible. Merci de votre compréhension.;;UTILISE_ANCESTRA
+Im1166;ERROR;166;ERROR_166;Votre personnage ne peut s'incarner tout de suite dans cet avatar, entre deux incarnations vous devez vous reposer au moins une minute.;;
+Im1167;ERROR;167;ERROR_167;Vous ne pouvez pas poser de percepteur ici avant %1 minutes;1;
+Im1168;ERROR;168;ERROR_168;Vous ne pouvez pas poser plus de %1 percepteur(s) par zone.;1;UTILISE_ANCESTRA
+Im1169;ERROR;169;ERROR_169;Impossible de lancer ce sort : vous ne le possédez pas !;;UTILISE_ANCESTRA
+Im1170;ERROR;170;ERROR_170;Impossible de lancer ce sort : Vous avez %1 PA disponible(s) et il vous en faut %2 pour ce sort !;1,2;UTILISE_ANCESTRA
+Im1171;ERROR;171;ERROR_171;Impossible de lancer ce sort : Vous avez une portée de %1 à %2 et vous visez à %3 !;1,2,3;UTILISE_ANCESTRA
+Im1172;ERROR;172;ERROR_172;Impossible de lancer ce sort : la cellule visée n'est pas disponible !;;UTILISE_ANCESTRA
+Im1173;ERROR;173;ERROR_173;Impossible de lancer ce sort autrement qu'en ligne droite !;;UTILISE_ANCESTRA
+Im1174;ERROR;174;ERROR_174;Impossible de lancer ce sort : un obstacle gène votre vue !;;UTILISE_ANCESTRA
+Im1175;ERROR;175;ERROR_175;Impossible de lancer ce sort actuellement.;;UTILISE_ANCESTRA
+Im1176;ERROR;176;ERROR_176;Votre monture est trop jeune pour être chevauchée. Il faut d'abord l'élever correctement en enclos pour qu'elle grandisse un peu...;;
+Im1177;ERROR;177;ERROR_177;Vous avez trop d'objets dans votre inventaire, vous ne pouvez pas tous les voir.;;
+Im1178;ERROR;178;ERROR_178;Vous avez trop de montures à l'étable, retirez-en quelque-unes pour les voir toutes.;;
+Im1179;ERROR;179;ERROR_179;Vous avez trop d'objets dans votre banque, retirez-en quelque-uns pour tous les voir.;;
+Im1180;ERROR;180;ERROR_180;Ce percepteur est en train d'être récolté, vous ne pouvez pas l'attaquer.;;UTILISE_ANCESTRA
+Im1181;ERROR;181;ERROR_181;Cette rune est trop puissante pour être ajoutée sur cette arme.;;
+Im1182;ERROR;182;ERROR_182;<b>%1</b> vient d'être déconnecté, il quittera la partie dans <b>%2</b> tour(s) s'il ne se reconnecte pas avant.;1,2;
+Im1183;ERROR;183;ERROR_183;La zone 'Incarnam' fonctionne sur plusieurs instances, pour éviter qu'un trop grand nombre de joueurs soient présent dans cette zone de petite taille. Ceci signifie qu'il existe plusieurs 'Incarnam' en parallèle, afin qu'il n'y ait pas plus d'un certain nombre de joueurs dans la même instance. Vous pouvez donc ne pas être dans le même 'Incarnam' que vos amis, pour les rejoindre, vous pouvez utiliser la liste d'amis, et vous retrouver instantanément à leurs côtés, à conditions qu'ils soient eux aussi dans Incarnam en dehors des grottes et donjons.;;
+Im1184;ERROR;184;ERROR_184;<b>%1</b> vient de se reconnecter en combat.;1;
+Im1185;ERROR;185;ERROR_185;Tu ne peux pas t'incarner si tu es mort.;;
+Im1186;ERROR;186;ERROR_186;Comme ton équipe a remporté le combat, ton personnage <b>%1</b> a été sauvé de justesse d'une mort affreuse.;1;
+Im1187;ERROR;187;ERROR_187;Une déconnexion massive a été détectée : ton personnage <b>%1</b> est sauvé d'une mort affreuse.;1;
+Im1188;ERROR;188;ERROR_188;Une déconnexion massive a été détectée : le combat est annulé.;;
+Im1189;ERROR;189;ERROR_189;Il y a déjà trop de personnes présentes;;
+Im1190;ERROR;190;ERROR_190;Ton personnage <b>%1</b> est mort, rien ni personne n'a pu le sauver.;1;
+Im1191;ERROR;191;ERROR_191;Tu ne peux plus faire cette quête aujourd'hui, car tu l'as déjà finie avec un autre de tes personnages.;;
+Im1192;ERROR;192;ERROR_192;Ton personnage <b>%1</b> a été sauvé d'une mort affreuse, car le combat n'était pas fini lorsque le serveur s'est éteint.;1;
+Im1193;ERROR;193;ERROR_193;Impossible de lancer ce sort : la cellule visée n'est pas valide !;;
+Im1194;ERROR;194;ERROR_194;Il y a trop de monstres invoqués sur la carte !;;
+Im1195;ERROR;195;ERROR_195;"Vous ne pouvez pas utiliser cet objet sur un personnage qui n'a pas activé son mode "" + """""" + ""Joueur contre joueur"" + """""" + "".";;
+Im1196;ERROR;196;ERROR_196;Ton alignement ne te permet pas d'utiliser ce transport !;;
+Im1197;ERROR;197;ERROR_197;Tu ne peux utiliser cet objet que sur des joueurs d'alignement opposé !;;
+Im1198;ERROR;198;ERROR_198;Malgré toutes vos tentatives, votre cible reste introuvable. Réessayez plus tard.;;
+Im1199;ERROR;199;ERROR_199;Ton meneur a quitté la guilde <b>%2</b>, et c'est <b>%1</b> qui a été désigné pour le remplacer.;1,2;
+Im1200;ERROR;200;ERROR_200;Tu ne peux libérer davantage de monstres, attaque d'abord ceux que tu as déjà libérés !;;
+Im1201;ERROR;201;ERROR_201;<b>%1</b> vient de vous bannir. Le bannissement sera effectif dès la fin du combat.;1;
+Im1202;ERROR;202;ERROR_202;La cible est actuellement invisible !;;
+Im1203;ERROR;203;ERROR_203;Tu ne peux pas avoir plus de <b>%1</b> invocation(s) en même temps.;1;
+Im1204;ERROR;204;ERROR_204;Impossible d'utiliser ce zaap.;;
+Im1205;ERROR;205;ERROR_205;Pour accéder à cette interface, il faut que tu fasses partie d'une guilde.;;
+Im1206;ERROR;206;ERROR_206;Impossible, ce joueur est déjà dans une guilde;;
+Im1207;ERROR;207;ERROR_207;Tu n'as pas le droit d'inviter des joueurs dans ta guilde.;;
+Im1208;ERROR;208;ERROR_208;Impossible d'inviter, ce joueur est inconnu ou non connecté.;;
+Im1209;ERROR;209;ERROR_209;Ce joueur est occupé. Impossible de l'inviter.;;
+Im1210;ERROR;210;ERROR_210;Impossible, ce personnage ne fait pas partie de la guilde.;;
+Im1211;ERROR;211;ERROR_211;Impossible, ce perso ou compte n'existe pas ou n'est pas connecté.;;
+Im1212;ERROR;212;ERROR_212;Vous ne pouvez rejoindre actuellement cette personne en raison d'une incompatibilité d'état.;;
+Im1213;ERROR;213;ERROR_213;La puissance de la magie de téléportation est inversement proportionnelle au carré de la distance. La distance actuelle est trop grande, vous ne pourriez rejoindre cette personne en un seul morceau.;;
+Im1214;ERROR;214;ERROR_214;Il n'y a pas de place disponible près de cette personne, vous risqueriez de vous rematérialiser dans un rocher ou un innocent tofu.;;
+Im1215;ERROR;215;ERROR_215;Ce challenge n'a actuellement aucune cible.;;
+Im1216;ERROR;216;ERROR_216;Pas les droits suffisants pour booster les caractéristiques et les rangs de sort dans la guilde.;;
+Im1217;ERROR;217;ERROR_217;Impossible de rejoindre le percepteur, Vous êtes occupé.;;
+Im1218;ERROR;218;ERROR_218;Multi-compte interdit lors de combat de guilde;;
+Im1219;ERROR;219;ERROR_219;On ne peut pas passer en mode marchand si on est dans un enclos!;;
+Im1220;ERROR;220;ERROR_220;Impossible d'utiliser le zaapi.;;
+Im1221;ERROR;221;ERROR_221;Impossible d'utiliser le transporteur lié au prisme!;;
+Im1222;ERROR;222;ERROR_222;Tu ne peux plus accélérer la vitesse d'apprentissage de tes montures aujourd'hui, tu dois t'en remettre à tes machines uniquement;;
+Im1223;ERROR;223;ERROR_223;[WIP] Votre conjoint n'a pas donné de signes de vie depuis trop longtemps, selon le rite d'Allister votre union est désormais caduque. Vous voilà libre. Est-ce une occasion de se réjouir ou une de pleurer ?;;
+Im1224;ERROR;224;ERROR_224;[WIP] Ton union avec %1 a été jugée caduque par contumace. Retour à la case célibat pour le moment.;1;
+Im1225;ERROR;225;ERROR_225;Attention, vous êtes sur un serveur de test dont l'objectif est la détection de problèmes dans les futures modifications. Tout ce qui est sur ce serveur (les personnages, les objets, les guildes, etc.) n'est pas permanent, et peut être supprimé ou remplacé à tout moment, et ce sans avertissement. Bon test à tous, et dans la bonne humeur !;;
+Im1226;ERROR;226;ERROR_226;Action impossible sur ce serveur.;;
+Im1227;ERROR;227;ERROR_227;[WIP] Vous devez atteindre le <b>niveau %1</b> pour utiliser cette monture.;1;
+Im1228;ERROR;228;ERROR_228;Ce lieu ne peut pas accueillir de percepteur.;;
+Im1229;ERROR;229;ERROR_229;[WAIT] Il y a déjà un piège sur cette case;;
+Im1230;ERROR;230;ERROR_230;[WAIT] Cet objet ne semble pas pouvoir être utilisé ...;;
+Im1231;ERROR;231;ERROR_231;Action impossible : pas de dragodinde équipée !;;
+Im1232;ERROR;232;ERROR_232;Action impossible : la dragodinde possède déjà ce gène;;
+Im1233;ERROR;233;ERROR_233;Action impossible : la dragodinde a déjà trop de gènes;;
+Im1234;ERROR;234;ERROR_234;Erreur : l'objet d'apparat ne doit pas être lié au compte !;;
+Im1235;ERROR;235;ERROR_235;Le Kralamoure Géant se repose encore dans sa tourbière. Vous devriez pouvoir le réveiller dans %1 minute(s).;1;
+Im1236;ERROR;236;ERROR_236;Vous ne pouvez pas placer plus de %1 de vos personnages sur ce type de cellule simultanément.;1;
+Im1237;ERROR;237;ERROR_237;Vous ne possédez pas l'objet.;;
+Im1238;ERROR;238;ERROR_238;Le combat a été mis en pause.;;
+Im1239;ERROR;239;ERROR_239;À la fin du tour du joueur actuel, le combat sera mis en pause.;;
+Im1240;ERROR;240;ERROR_240;Le combat reprend son cours.;;
+Im1241;ERROR;241;ERROR_241;Impossible d'utiliser ce corps à corps : Vous avez %1 PA disponible(s) et il vous en faut %2 pour ce corps à corps !;1,2;
+Im1242;ERROR;242;ERROR_242;Impossible de rejoindre le percepteur, vous êtes à l'intérieur d'une maison.;;
+Im1243;ERROR;243;ERROR_243;Action impossible : vous n'êtes plus en recherche de cible.;;
+Im1244;ERROR;244;ERROR_244;Erreur : un objet socle ne doit pas être lié au compte pour recevoir une apparence.;;
+Im1245;ERROR;245;ERROR_245;Impossible de combattre car tu es occupé.;;
+Im1246;ERROR;246;ERROR_246;Le niveau %1 est requis;1;
+Im1247;ERROR;247;ERROR_247;Erreur : cet objet ne peut pas être personnalisé !;;
+Im1248;ERROR;248;ERROR_248;Erreur : tu n'as pas participé à ce combat.;;
+Im1249;ERROR;249;ERROR_249;Impossible d'ajouter cette carte : elle est déjà dans ton classeur.;;
+Im1250;ERROR;250;ERROR_250;Impossible : le personnage n'est pas sur la carte.;;
+Im1251;ERROR;251;ERROR_251;Impossible d'ouvrir le classeur du joueur car il est vide.;;
+Im1252;ERROR;252;ERROR_252;Aïe ! Pas de chance, tu n'as pas reçu de paquets cette fois...;;
+Im1253;ERROR;253;ERROR_253;Impossible de se déplacer ou de rejoindre un combat tant que le butin n'a pas été choisi;;
+Im1254;ERROR;254;ERROR_254;Impossible d'effectuer cette action : vous devez avoir complété au moins <b>%1</b> familles dans votre collection Tragic The Gardening.;1;
+Im1255;ERROR;255;ERROR_255;Impossible d'effectuer cette action : vous devez avoir complété toutes les familles dans votre collection Tragic The Gardening.;;
+Im1256;ERROR;256;ERROR_256;Impossible d'effectuer cette action : vous devez avoir <b>%1</b> dans votre collection Tragic The Gardening.;1;
+Im1257;ERROR;257;ERROR_257;Impossible d'effectuer cette action : vous devez avoir <b>%1</b> en version brillante dans votre collection Tragic The Gardening.;1;
+Im1258;ERROR;258;ERROR_258;Impossible d'effectuer cette action : vous devez avoir complété au moins <b>%1</b> familles en version brillante dans votre collection Tragic The Gardening.;1;
+Im1259;ERROR;259;ERROR_259;Impossible d'effectuer cette action : vous devez avoir complété toutes les familles en version brillante dans votre collection Tragic The Gardening.;;
+Im1260;ERROR;260;ERROR_260;Impossible d'effectuer cette action : vous devez avoir plus de <b>%1</b> cartes dans votre collection Tragic The Gardening.;1;
+Im1261;ERROR;261;ERROR_261;Impossible d'effectuer cette action : vous devez avoir complété la famille <b>%1</b> dans votre collection Tragic The Gardening.;1;
+Im1262;ERROR;262;ERROR_262;Impossible d'effectuer cette action : vous devez avoir complété la famille <b>%1</b> en version brillante dans votre collection Tragic The Gardening.;1;
+Im1263;ERROR;263;ERROR_263;Impossible de poser un percepteur sur la carte même où vous vous êtes connecté.;;
+Im1264;ERROR;264;ERROR_264;Impossible d'attaquer un percepteur sur la carte même où vous vous êtes connecté.;;
+Im1265;ERROR;265;ERROR_265;Impossible de détruire cet objet.;;
+Im1266;ERROR;266;ERROR_266;Il faut avoir achevé un objectif;;
+Im1268;ERROR;268;ERROR_268;Tant que votre maison est en vente, vous ne pouvez la partager avec votre guilde.;;
+Im1269;ERROR;269;ERROR_269;Vous devez attendre encore %1 seconde(s) avant de pouvoir réessayer;1;
+Im1270;ERROR;270;ERROR_270;Impossible de remplacer le défenseur car il est prioritaire.;;
+Im1271;ERROR;271;ERROR_271;%1 n'est pas en combat;1;
+Im1272;ERROR;272;ERROR_272;Cette fonctionnalité est temporairement désactivée en raison d'un problème technique. Veuillez réessayer plus tard.;;
+Im1273;ERROR;273;ERROR_273;Vous ne pouvez pas équiper un objet d'apparat directement, essayez plutôt de l'associer sur un objet équipé.;;
+Im1274;ERROR;274;ERROR_274;Erreur : l'objet utilisé en apparat doit être de niveau inférieur ou égal à celui de l'objet qui recevra son apparence.;;
+Im1275;ERROR;275;ERROR_275;Tu es trop chargé. Jette quelques objets pour pouvoir rejoindre le combat...;;
+Im1276;ERROR;276;ERROR_276;Tu es trop chargé. Tu ne pourras bientôt plus rejoindre de combat. Pense à vider ton inventaire.;;
+Im1277;ERROR;277;ERROR_277;<b>%1</b> vous ignore.;1;
+Im1278;ERROR;278;ERROR_278;<b>%1</b> vous ignore et ne reçoit donc plus vos messages.;1;
+Im1279;ERROR;279;ERROR_279;<b>%1</b> a arrêté de vous suivre.;1;
+Im1280;ERROR;280;ERROR_280;L'effet de <b>%1</b> s'est estompé.;1;
+Im1281;ERROR;281;ERROR_281;Vous avez atteint le seuil Maximum de kamas dans votre inventaire.;;
+Im1282;ERROR;282;ERROR_282;Pas de sondage en cours. Le précédent sondage s'est terminé le %1/%2/%3.;1,2,3;
+Im1284;ERROR;284;ERROR_284;Cette action est impossible car tu es occupé.;;
+Im1292;ERROR;292;ERROR_292;Vous possédez déjà un passif divin, vous devez le vendre avant d'en prendre un nouveau.;;
+Im1293;ERROR;293;ERROR_293;Le sort que vous essayez d'améliorer est déjà au niveau maximum.;;
+Im1294;ERROR;294;ERROR_294;Votre inventaire de tonique est plein, vous devez en vendre avant d'en prendre un nouveau.;;
+Im241;PVP;41;PVP_41;La %1 menant à votre coeur de ville du %2 est attaquée.;1,2;
+Im286;PVP;86;PVP_86;Vous devez repousser l'attaque sur la zone %1 avant que nos ennemis ne s'en emparent.;1;
+Im287;PVP;87;PVP_87;Le coeur de la zone %1 est ouvert aux ennemis, protégez le !;1;
+Im288;PVP;88;PVP_88;Le coeur de la zone %1 est refermé... Terrassez les ennemis encore présents et la victoire est acquise.;1;
+Im289;PVP;89;PVP_89;Vos alliés attaquent en ce moment la zone %1. Ils ont certainement besoin de votre aide.;1;
+Im290;PVP;90;PVP_90;Le coeur de la zone %1 a été ouvert par vos alliés, vous pouvez tenter de capturer ce lieu !;1;

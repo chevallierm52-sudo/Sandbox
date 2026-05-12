@@ -135,6 +135,28 @@ public class GuildsData {
         }
     }
 
+
+    public static void updateMember(Guild guild, GuildMember member) {
+        if(guild == null || member == null) return;
+        Connection conn = null;
+        try {
+            conn = Connector.acquire();
+            try(PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE guild_members SET level=?, breed=?, gender=? WHERE guild_id=? AND character_id=?")) {
+                ps.setInt(1, member.getLevel());
+                ps.setInt(2, member.getBreed());
+                ps.setByte(3, member.getGender());
+                ps.setInt(4, guild.getId());
+                ps.setInt(5, member.getCharacterId());
+                ps.executeUpdate();
+            }
+        } catch(Exception e) {
+            logger.error("GuildsData.updateMember() failed: {}", e.getMessage());
+        } finally {
+            if(conn != null) Connector.release(conn);
+        }
+    }
+
     public static void save(Guild guild) {
         Connection conn = null;
         try {

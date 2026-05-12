@@ -39,6 +39,8 @@ public class BasicParser {
 			short cell = Formulas.getZaapCell((short) map.getId());
 			if(cell < 0) cell = 200;
 
+			// Un clic mini-carte peut arriver pendant un déplacement non terminé.
+			// La téléportation nettoie la pile d'actions pour éviter le blocage BUSY.
 			RolePlayMovement.teleport(client, map, cell);
 		} catch(NumberFormatException e) {
 			// malformed packet, ignore

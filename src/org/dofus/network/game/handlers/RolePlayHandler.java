@@ -53,9 +53,7 @@ public class RolePlayHandler extends GameClientHandler {
 		//Spell
 		session.write("SL"); //Spell list message
 		session.write("AR" + character.getRestriction().toBase36());
-		// Inventaire au login
 		Inventory inv = character.getInventory();
-		session.write(inv.buildOLPacket());
 		session.write("Ow" + inv.getUsedPods() + "|" + character.getMaxPods());
 		session.write("eL0|"); //Quest?
 		session.write("BD" + StringUtils.CURRENT_DATE_FORMATTER.format(new Date())); // Send actual time
@@ -79,7 +77,7 @@ public class RolePlayHandler extends GameClientHandler {
 			session.write("M111|" + character.getEnergy());
 		session.write("IC|"); //On remet à zéro les drapeaux
 		session.write("BT82800000");//FIXME idk Gestion de la nuit
-		//Regen life
+		RegenService.refresh(character, session);
 	}
 	
 	@Override
@@ -123,7 +121,7 @@ public class RolePlayHandler extends GameClientHandler {
 				GuildParser.parse(character, session, packet);
 			break;
 			case 'O': // Inventaire / équipement
-				InventoryParser.parse(character, session, packet);
+				InventoryParser.parse(character, session, client, packet);
 			break;
 			case 'M': // Métier / artisanat
 				CraftParser.parse(character, session, packet);
@@ -207,7 +205,8 @@ public class RolePlayHandler extends GameClientHandler {
 					break;
 				}
 				break;
-			case 'A': //Console
+			case 'A': //Console admin client : BA!getitem 9131 1
+				AdminParser.parseBasicAdmin(character, session, client, packet);
 				break;
 			case 'D': //Date
 				break;
@@ -262,7 +261,7 @@ public class RolePlayHandler extends GameClientHandler {
             if(packet.length() > 2) {
                 try {
                     int groupId = Integer.parseInt(packet.substring(2));
-                    FightParser.initiateFightVsMonsters(character, session, groupId);
+                    GameParser.attackMonsterGroup(session, client, groupId);
                 } catch(NumberFormatException e) { /* ignore */ }
             }
             break;

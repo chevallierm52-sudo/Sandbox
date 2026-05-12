@@ -1,5 +1,268 @@
 # Changelog
 
+## [Phase 19 - Familier PV et clic ressource officiel] - 2026-05-12
+
+### Familiers
+- Encodage des points de vie familiers en format client 1.29 `800#vie#0#vieMax#0` (`320#a#0#a#0`) au lieu d'un jet fixe `0d0+vie`.
+- Les anciens familiers charges depuis la BDD sont normalises en memoire afin que la ligne de PV apparaisse aussi apres reconnexion.
+- Les pertes/soins de PV conservent maintenant le maximum du familier et renvoient un paquet `OC` avec l'effet de vie lisible par le client.
+- Le parsing `Of` des nourritures accepte maintenant les variantes d'ordre cible/nourriture et les UIDs en decimal ou hexadecimal, pour corriger les familiers qui refusaient de manger alors que l'objet existe bien en inventaire.
+- Le parsing `Of{familier}|{position}|{nourriture}` privilegie maintenant le premier UID comme cible et le dernier UID comme nourriture, afin de ne plus confondre la position d'equipement avec un item.
+- Une nourriture refusee renvoie maintenant le message officiel `Im153` au lieu d'une condition impossible generique.
+
+### Deplacement / ressources
+- Les cellules interactives bloquantes restent non marchables, mais un chemin client qui finit sur une ressource est maintenant tronque sur la derniere cellule marchable.
+- Les `GA500` recus pendant la marche sont mis en attente puis executes apres le `GKK`, ce qui reproduit le flux officiel : courir jusqu'au pied de la ressource puis lancer l'interaction.
+- Si le joueur est deja au contact, le serveur libere l'action de mouvement sans bloquer le client et laisse l'action ressource se traiter normalement.
+- Suppression du faux no-op `GA;2` qui etait interprete par le client comme une action de changement de map ; les chemins nuls passent maintenant par `GA1;4` ackable, sans envoyer un chemin de marche vide au client Flash.
+- Les attaques de groupes de monstres (`GR` et `GA906`) sont mises en attente si le joueur est encore en train de marcher, puis declenchees apres le `GKK` pour eviter la pile d'actions bloquee.
+- Une interaction carte executee apres une marche ne declenche plus le trigger/soleil de la cellule d'arret dans le meme cycle, ce qui evitait les teleportations surprises autour des ressources.
+- Les `GA500` recus pendant une action non-mouvement sont refuses proprement par `BN` au lieu d'entrer dans une action concurrente.
+
+### Regen / packets
+- `RegenService` n'envoie plus de paquet `As` strictement identique au precedent et ne redemarre plus une regen deja planifiee. Le tick officiel/rythme de regen n'a pas ete change sans validation.
+
+## [Phase 18 - Puits non marchables et familiers pets.sql] - 2026-05-12
+
+### Cartes / interactifs
+- Ajout de `InteractiveObjectCellsData` : memoire SQL optionnelle `interactive_object_cells(map_id, cell_id, skill_id, blocking)` pour bloquer les cellules interactives quand les 560 cellules de la map ne sont pas decodees cote serveur.
+- Seed direct du puits d'Amakna (map `1359`, cellule `283`, skill `102`) : le serveur refuse maintenant le deplacement roleplay sur cette cellule meme si `map_templates` ne contient que la cle/date client.
+- `InteractiveObjectService` apprend et persiste les cellules `GA500` inconnues afin que les ressources/interactifs deviennent bloquants lors des prochains deplacements.
+- Au chargement de map, un personnage sauvegarde sur une cellule devenue invalide est replace sur la cellule valide la plus proche.
+
+### Familiers
+- Ajout du loader `PetsData` branche sur la table `pets` (`StatsUp`, `Max`, `Gain`, `DeadTemplate`).
+- La nourriture des familiers utilise maintenant les nourritures autorisees de `pets.sql`; une nourriture invalide renvoie une condition impossible.
+- La poudre d'Eniripsa (`2239`) rend 1 PV aux familiers vivants, sans depasser 10 PV.
+- A 0 PV, le familier se transforme en fantome via `DeadTemplate`, perd ses effets de vie/repas, passe en sac et conserve ses bonus pour une future resurrection.
+
+## [Phase 16 - Objets interactifs, ressources et cellules non marchables] - 2026-05-12
+
+### Cartes / cellules
+- Alignement du `MapCellDecoder` sur le decodeur client 1.29 : lecture de `layerObject1Num`, `layerObject2Num` et `layerObject2Interactive`.
+- Les cellules decodees exposent maintenant leur etat actif, leur objet interactif et une validation dediee au spawn de monstres.
+- Les groupes de monstres ne peuvent plus apparaitre sur une cellule non marchable, inactive, trigger/soleil ou contenant un objet interactif de couche 2.
+
+### Ressources / interactifs
+- Ajout d'un `InteractiveObjectService` pour centraliser les clics client `GA500` sur ressources, portes et objets interactifs de map.
+- Le serveur refuse les interactions sur cellules invalides ou non interactives, joue l'animation officielle `GA;501`, puis bascule l'objet en cooldown visuel via `GDF`.
+- Les objets interactifs sont automatiquement rendus a nouveau cliquables apres un delai de respawn serveur.
+
+### Deplacement / sol
+- Validation serveur des chemins roleplay avant broadcast : un client ne peut plus finir un deplacement sur une cellule non marchable ou occupee.
+- Les objets jetes au sol cherchent maintenant une cellule adjacente reellement marchable et libre selon les donnees de map decodees.
+- Les teleportations d'objets utilisables se recalculent vers la cellule valide la plus proche si la destination SQL cible une cellule invalide.
+
+## [Phase 17 - Donnees interactifs SQL et familiers] - 2026-05-12
+
+### Cartes / interactifs
+- Ajout du loader optionnel `InteractiveObjectsData` pour lire `interactive_objects_data` ou `interactive_object_data`.
+- Les cellules dont le `layerObject2Num` correspond a un interactif SQL `walkable=0` sont maintenant bloquees pour les joueurs, bots, monstres et depots au sol.
+- Les ressources/interactifs `GA500` utilisent maintenant `respawn` et `duration` depuis la table SQL quand ces valeurs sont disponibles.
+
+### Familiers
+- Initialisation propre des familiers type 18 : les nouveaux familiers demarrent avec leurs effets d'etat (`800` vie, `806` corpulence, `807` dernier repas) sans roller tous les bonus possibles du template.
+- Nourriture via `Of` : consommation de l'objet donne, mise a jour du dernier repas (`807/808`), corpulence normale (`806`) et gain de bonus borne par le cap du template.
+- Les familiers equipes rafraichissent les stats du personnage apres gain de bonus.
+- En fin de combat, un familier equipe perd 1 point de vie si son porteur meurt ; a 0 PV il est desequipe et persiste comme familier mort.
+
+## [Phase 15 - Spawn naturel : groupes multi-monstres restaurés] - 2026-05-12
+
+### Monstres / spawn
+- Correction d'une régression du placement naturel v4 : les lignes `monster_spawns` partageant la même cellule et la même orientation sont de nouveau regroupées dans un seul `MonsterGroup` avant résolution de la cellule naturelle.
+- Les groupes multi-monstres ne sont plus séparés en plusieurs groupes d'un seul monstre quand le premier membre occupe déjà la cellule naturelle.
+- Le placement naturel reste appliqué à tous les groupes, mais une seule fois par groupe logique complet.
+- Le log de spawn indique maintenant aussi le nombre de monstres contenus dans chaque groupe.
+
+### Notes
+- Les derniers cas de monstres posés sur des ressources ou éléments interactifs restent liés au manque de données serveur sur les cellules de récolte/interactifs. Une couche dédiée de cellules interdites au spawn sera ajoutée dans une prochaine étape.
+
+## [Phase 14 - Stats officielles, conditions objets, Obvijevan et regen] - 2026-05-11
+
+### Statistiques personnage
+- Base personnage forcee cote serveur a 6 PA et 3 PM, avec bonus +1 PA calcule au niveau 100 sans l'ecrire en doublon dans la BDD.
+- Pas de plafond PA/PM artificiel applique cote serveur pour rester compatible 1.29.
+- PV max recales sur une base minimale de 55 PV + 5 PV par niveau + vitalite totale.
+- Creation personnage : la vie initiale sauvegardee utilise maintenant le max calcule.
+- SQL : `sql/phase14_stats_items_regen.sql` met a jour les classes existantes en 55 PV / 6 PA / 3 PM.
+
+### Conditions objets
+- Evaluation des conditions avec groupes `&`/`,` en ET et alternatives `|` en OU.
+- Ajout des checks de conditions sur PA, PM, niveau, classe, sexe, alignement, grade, kamas et stats totales equipees.
+
+### Objets speciaux
+- Types Dofus, cadeau et objet vivant ajoutes aux types connus.
+- Objets vivants type 113 et cadeaux type 89 non stackables.
+- Support Obvijevan : association sur slot compatible, effets 970-974 persistants, dissociation `Ox`, changement de skin `Os` et nourriture `Of`.
+- Les accessoires personnage utilisent maintenant le template visuel vivant et les parametres `template~type~skin` attendus par le client.
+- `Ox` rend maintenant l'Obvijevan detache dans le sac au lieu de supprimer seulement les effets visuels.
+- Refus d'associer un Obvijevan sur un objet deja vivant, correction du decalage de skin `Os`, et validation du type de nourriture `Of`.
+- Les Obvijevan nus type 113 recoivent maintenant les effets vivants initiaux `971/972/974`, pour que le client les affiche dans l'inventaire.
+- Les Obvijevan nus ajoutent aussi `973` avec le type supporte (`17/16/1/9`), sinon le client cherche l'icone dans le type 113 et ne rend pas l'objet.
+- Les cadeaux Obvijevan `9360-9363` s'ouvrent via `OU` en vrais Obvijevan `9255/9256/9233/9234`.
+- Les commandes admin `.item` et `BA!getitem` acceptent `113` comme raccourci de test pour donner les quatre Obvijevan reels.
+- SQL : `sql/phase14_stats_items_regen.sql` force les templates Obvijevan en type 113 et leurs cadeaux en type 89.
+- Association, dissociation, skin et nourriture Obvijevan renvoient maintenant un paquet `OC` complet pour rafraichir le sprite de l'objet support sans deco/reco.
+- Nourrir un Obvijevan augmente son XP `974` selon le niveau de l'objet mange, avec clamp sur les 20 seuils de skin officiels du client 1.29.
+- La nourriture Obvijevan affiche maintenant le gain `+XP` et le skin maximum debloque.
+- Commande debug `.obvixp <uid> <xp>` / `BA!obvixp <uid> <xp>` pour ajouter directement de l'XP Obvijevan, UID accepte en decimal ou hex.
+
+### Regeneration
+- Regen passive remplacee par 1 PV par seconde apres 10 secondes hors combat.
+- Suppression de l'ancien rythme trop rapide `maxLife / 10` toutes les 2 secondes.
+- Le refresh vie continue d'envoyer un paquet `As` complet pour garder le client synchronise.
+
+## [Phase 13 - Corrections commandes, IM, regen vie et stacking equipables] - 2026-05-11
+
+### Commandes admin
+- Recherche joueur insensible a la casse pour les commandes admin en ligne (`.level`, `.item`, etc.).
+- Correction du crash possible de `.level` lie a `Statistic.add()` quand une stat n'existait pas encore dans la map.
+
+### Messages client
+- Neutralisation du `Im021;quantite~nom` qui affichait `Undefined` cote client : les ajouts admin utilisent maintenant un message canal serveur propre.
+
+### Vie / regeneration
+- `RegenService` renvoie maintenant le paquet `As` complet au lieu d'un paquet `AS` incomplet.
+- La regeneration est relancee uniquement si `life < lifeMax`, et stoppee si la vie est pleine.
+- Refresh immediat des stats/vie apres equipement, desequipement ou boost vitalite.
+
+### Inventaire / equipement
+- Les effets envoyes au client sont prefixes par `,` dans la partie stats des items, comme attendu par le client 1.29.
+- Les anciennes lignes `character_items.rolled_effects` contenant encore des jets template (`1dX+Y`) sont rerollees au chargement puis sauvegardees.
+- Les equipements ne sont plus stackables : les commandes `.item` et `BA!getitem` creent des instances separees quantite 1 pour les objets equipables.
+- Refus d'equiper une pile `quantity != 1` pour eviter les disparitions/doublons.
+- Le restack est limite aux templates non equipables et aux jets identiques.
+
+## [Phase 12 — Menu admin BA!getitem + jets aléatoires objets] — 2026-05-11
+
+### Commandes administrateur
+
+- **`RolePlayHandler.java`** — Le paquet console admin `BA` est maintenant branché. Le client peut envoyer directement des commandes internes du menu admin.
+- **`AdminParser.java`** — Ajout de `parseBasicAdmin()` pour traiter les paquets du type `BA!getitem 9131 1`.
+- **`AdminParser.java`** — Ajout de la commande `getitem` utilisée par le menu admin : `BA!getitem <templateId> [quantite]`. Elle donne l'objet au personnage GM courant, sans devoir écrire `.item Cheuch ...`.
+- **`AdminParser.java`** — Factorisation de la création d'objet dans `giveItem()` : `.item <nom> <templateId> [quantite]` et `BA!getitem <templateId> [quantite]` utilisent maintenant le même code.
+- **`AdminParser.java`** — Correction d'un doublon accidentel de méthode `getSession()` introduit pendant les phases précédentes.
+
+### Objets / jets
+
+- **`ItemEffect.java`** — Amélioration de la formule de création des jets aléatoires. Le serveur lit maintenant les expressions de dés du champ client, par exemple `1d20+0`, `1d6+4`, puis génère une valeur aléatoire réelle.
+- **`ItemEffect.java`** — Fallback conservé pour les anciennes bases : si le champ de dés n'est pas exploitable, le serveur utilise les bornes numériques déjà présentes dans l'effet.
+- Les objets donnés par `.item` ou par `BA!getitem` sont donc créés avec des jets rollés au moment de l'insertion, puis sauvegardés dans `character_items.rolled_effects`.
+
+### Test conseillé
+
+- Envoyer depuis le menu admin : `BA!getitem 9131 1`, `BA!getitem 7925 1`, `BA!getitem 10125 1`.
+- Vérifier que l'objet arrive dans l'inventaire avec `OAKO*O`, que les pods se mettent à jour avec `Ow`, et que deux créations du même objet avec une plage de stats peuvent avoir des jets différents.
+
+## [Phase 11 — Commandes GM level/item + résistances objets] — 2026-05-11
+
+### Commandes GM
+
+- **`AdminParser.java`** — Ajout de la commande `.item <nom> <templateId> [quantité]` : création d'une instance d'objet depuis `item_template`, insertion en BDD dans `character_items`, ajout en inventaire et envoi client `OAKO*O;...` + refresh pods `Ow`.
+- **`AdminParser.java`** — Correction complète de `.level <nom> <niveau>` : changement réel du niveau, recalage de l'expérience au seuil minimum du niveau, recalcul des points de caractéristiques/sorts, correction PA niveau 100, sauvegarde BDD et envoi des paquets `AN`, `As`, `Ow`, `Im`.
+
+### Refresh social après changement de niveau
+
+- **`AdminParser.java`** — Refresh groupe : renvoi `PM+{parseParty}` aux membres connectés pour mettre à jour le niveau du personnage dans le groupe.
+- **`AdminParser.java` / `GuildsData.java`** — Refresh guilde : mise à jour du cache `GuildMember.level`, sauvegarde `guild_members.level`, puis renvoi `gL` aux membres connectés.
+- **`AdminParser.java`** — Refresh map : renvoi `GM|-id` puis `GM|+...` pour mettre à jour l'affichage/aura du personnage après changement de niveau.
+
+### Statistiques objets
+
+- **`Statistic.java`** — Le paquet `As` inclut maintenant les bonus de résistances des objets équipés : résistances fixes, résistances %, résistances PvP fixes, sur les éléments neutre/terre/eau/air/feu.
+
+### Expérience
+
+- **`CharacterExperience.java`** — Ajout d'un setter contrôlé `setLevel(short)` pour les commandes GM/debug, avec recalage de l'XP sur le minimum du niveau.
+
+## [Objets Dofus 1.29 - inventaire, sol, ramassage et accessoires] - 2026-05-11
+
+### Phase 01 - protocole inventaire
+- Correction du parsing des paquets objets officiels du client 1.29 : `OM`, `OD`, `Od`, `OU` et `Ou`.
+- Alignement des positions d'equipement sur les slots officiels : sac `-1`, amulette `0`, arme `1`, anneaux `2/4`, ceinture `3`, bottes `5`, coiffe `6`, cape `7`, familier `8`, Dofus `9-14`, bouclier `15`.
+- Correction des paquets serveur : `OAKO*O;...`, `OMuid|position`, `OQuid|quantity`, `ORuid`, `Owused|max`.
+- Sauvegarde BDD de `character_items.position` et `quantity` apres equipement, desequipement ou modification de pile.
+
+### Phase 02 - depose d'objets au sol
+- Remplacement de la suppression temporaire `OD` par une vraie depose au sol.
+- Ajout d'un etat serveur en memoire par map pour les objets poses au sol.
+- Affichage map via `GDO+cell;templateId;0`.
+- Envoi des objets deja presents aux joueurs qui chargent la map tant que le serveur tourne.
+
+### Phase 03 - vraies cases adjacentes, messages IM et ramassage
+- Correction des cellules adjacentes Dofus 1.29 autour du personnage : `-15`, `-14`, `+14`, `+15`.
+- Refus de depose si l'objet est equipe, avec `Im1129`.
+- Refus de depose si les quatre cellules autour du personnage sont occupees ou invalides, avec `Im1145`.
+- Verification des collisions avec joueurs, PNJ, groupes de monstres et objets deja poses.
+- Ajout du ramassage basique : retrait visuel `GDO-`, ajout inventaire `OA` ou `OQ`, recalcul pods `Ow`.
+- Prise en charge d'un cas `GA500` pour interaction/clic sur cellule contenant un objet au sol.
+
+### Phase 04 - restack et accessoires personnage
+- Correction du restack au ramassage : deux objets de meme template et memes jets fusionnent dans la pile existante.
+- Ajout de la generation des accessoires visibles depuis l'inventaire equipe.
+- Broadcast de changement d'apparence via `Oa{characterId}|{accessories}`.
+
+### Phase 05 - ordre officiel des accessoires
+- Correction de l'ordre graphique lu par le client 1.29 : index 1 coiffe, index 2 cape, index 3 familier, index 4 arme, index 5 bouclier.
+- Correction du decalage visuel qui pouvait afficher le familier sur la tete ou les couches sur de mauvais emplacements.
+
+### Phase 06 - arme masquee en roleplay
+- Conservation de l'arme equipee en inventaire et en BDD.
+- Masquage volontaire du sprite d'arme dans les accessoires `GM/Oa` roleplay pour rester coherent avec l'affichage attendu.
+- Conservation d'un slot arme vide dans la chaine d'accessoires pour ne pas redecaler les autres layers.
+
+### Phase 07 - accessoires sur l'ecran de selection
+- Ajout des accessoires equipes dans le paquet `ALK` de liste des personnages.
+- L'ecran de selection affiche maintenant coiffe, cape, familier et bouclier avec le meme ordre que le roleplay.
+- L'arme reste masquee dans cette chaine pour garder le meme comportement visuel que sur la map.
+
+### Phase 08 - garde-fous d'equipement
+- Ajout des refus d'equipement cote serveur avant modification d'inventaire.
+- Refus si le niveau du personnage est inferieur au niveau requis de l'objet, avec `Im13`.
+- Refus des slots invalides et des conditions basiques non satisfaites, avec `Im11`.
+- Ajout d'un support optionnel des colonnes `conditions` / `criteria` / `criterions` dans `item_template`, sans casser les bases qui ne les ont pas.
+- Ajout d'un support optionnel des colonnes `two_handed` / `is_two_handed` pour les armes a deux mains.
+- Gestion des conflits arme a deux mains / bouclier : desequipement automatique de l'element incompatible et envoi des messages `Im78` / `Im79`.
+- Refus d'equiper deux fois le meme Dofus dans les slots `9-14`.
+
+### Phase 10 - recalcul des stats d'equipement
+- Ajout du calcul des bonus/malus fournis par les objets equipes sans les melanger aux stats de base du personnage.
+- Le paquet `As` envoie maintenant les colonnes `base,equipement,gift,buff,total` avec les bonus d'equipement reels.
+- Recalcul automatique apres equipement, desequipement et remplacement d'objet.
+- La vitalite equipee augmente maintenant les PV max affiches.
+- La force equipee et les bonus pods `158` augmentent maintenant les pods max.
+- Initiative et prospection prennent maintenant en compte l'equipement dans l'en-tete du paquet `As`.
+- Gestion des principaux malus officiels : PA, PM, portee, initiative, prospection, vitalite, sagesse, force, intelligence, chance, agilite, pods et coups critiques.
+
+
+
+## [Bots - Navigation par soleils, memoire de chemins et evaluation monstres] - 2026-05-11
+
+### Navigation bots
+- Ajout de `BotPathMemory.java` pour apprendre les chemins empruntes via les `map_triggers`.
+- Les bots memorisent les transitions `map -> cellule soleil -> nextMap` dans `bot_paths.csv`.
+- Les chemins sont scores selon leur usage, les maps jugees favorables et les maps jugees dangereuses.
+- `BotBehavior.java` utilise maintenant les cellules soleil comme cible d'exploration au lieu de chercher uniquement un bord de map au hasard.
+- Les bots marchent vers la cellule du trigger, declenchent le changement de map, puis enregistrent le passage.
+- Le chemin vers le soleil est envoye en une seule action `GA1`, avec estimation du temps de marche avant changement de map.
+- Ajout d'un verrou temporel de deplacement pour eviter qu'un bot relance un mouvement pendant son animation.
+- Le deplacement aleatoire reste disponible en fallback si aucune sortie exploitable n'est connue.
+
+### Evaluation des monstres
+- Ajout de `BotMonsterStrategy.java` pour analyser les groupes de monstres visibles sur la carte.
+- Evaluation locale basee sur le niveau, les PV, les statistiques du bot, la composition du groupe et la personnalite du bot.
+- Les bots evitent davantage les cartes dont les groupes semblent trop dangereux pour leur profil.
+- Les cartes avec groupes favorables renforcent positivement les chemins qui y menent.
+
+### ChatGPT tactique
+- Ajout de `BotAIService.getCombatAdvice(...)` pour demander un avis court a ChatGPT quand l'heuristique locale est incertaine.
+- L'avis attendu est limite a `FIGHT` ou `AVOID` avec une raison courte.
+- Les decisions restent cachees temporairement pour eviter de solliciter l'API a chaque tick.
+- Le systeme continue de fonctionner en mode heuristique si OpenAI est desactive ou rate-limit.
+
+### Initialisation
+- `Main.java` initialise et sauvegarde la memoire des chemins au demarrage/arret serveur.
+
 ## [Débogage maps, monstres et diagnostic serveur] — 2026-05-11
 
 ### Base de données
@@ -141,8 +404,8 @@ Parseur complet des paquets `O` (inventaire, équipement) :
 - Si des items existent → crée un `Inventory`, charge les items, assigne via `character.setInventory()`.
 - Import `Inventory`, `Item`, `List` ajoutés.
 
-#### `RolePlayHandler` constructeur — `OL` + `Ow` au login
-- Envoi `inv.buildOLPacket()` (liste complète des items) au login.
+#### `GameScreenHandler` / `RolePlayHandler` — inventaire + `Ow` au login
+- Les items sont fournis dans `ASK` et `RolePlayHandler` envoie seulement `Ow` pour les pods.
 - Envoi `Ow{usedPods}|{maxPods}` (pods réels calculés depuis l'inventaire).
 - Remplace l'ancien `Ow0|{maxPods}` hardcodé.
 
@@ -427,10 +690,16 @@ Branchement : `BasicParser.channelsMessage()` → si message commence par `.` �
 ### Système d'inventaire
 
 - **`ItemEffect.java`** — Effet d'objet (effectId, dice, min, max, special). Constantes des IDs courants. `roll()` pour valeur aléatoire.
-- **`ItemTemplate.java`** — Template global (BDD `item_templates`). `buildEffectsString()` pour le paquet OL.
+- **`ItemTemplate.java`** — Template global (BDD `item_template`). `buildEffectsString()` pour le paquet OL.
 - **`Item.java`** — Instance (uid unique, effets rollés, position slot). `toOLEntry()` pour OL/OA/OM. Stacking automatique des ressources.
 - **`Inventory.java`** — Inventaire complet : bag, slots équipement, poids, mutations (add/remove/equip/unequip). Packets OL/OA/OM/OR/Ow.
-- **`ItemsData.java`** — Chargement `item_templates` + `character_items`. CRUD complet (insert, update, delete). Parsing d'effets depuis chaîne CSV.
+- **`ItemsData.java`** — Chargement `item_template` + `character_items`. CRUD complet (insert, update, delete). Parsing d'effets depuis chaîne CSV/format Dofus.
+- Alignement items avec la base `dofus_complete.sql` : lecture/ecriture des effets Dofus officiels `effect#p1#p2#p3#dice` separes par virgule, tout en gardant la compatibilite avec l'ancien CSV interne.
+- Correction des type_id/slots d'equipement Dofus 1.29 : amulette 3, armes 4, anneaux 5/7, ceinture 6, bottes 8, chapeau 1, cape 2, familier 9, bouclier 10.
+- Persistance des items crees par craft et drops de combat : creation d'items reels en inventaire, paquet `OAKO` officiel et sauvegarde/update BDD.
+- Alignement inventaire sur StarLoco : les entrees item sont encodees en hex (`guid~template~qty~pos~stats;`), `OAKO` est utilise pour les ajouts et `OMuid|pos` pour les deplacements.
+- Les items sont maintenant injectes dans le paquet `ASK` de selection personnage comme sur StarLoco, et le `OL` separe au login n'est plus envoye.
+- Verification avec `ressources/Dofus-client-1.29-master` : le client lit les items du `ASK` via `items.split(";")` en commencant a l'index 1, donc la liste d'items envoyee dans `ASK` est prefixee par `;` pour que le premier objet ne soit pas ignore.
 
 ---
 

@@ -4,7 +4,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -141,35 +143,80 @@ public class MonstersData {
 
     private static int spawnForMap(Connection conn, MapTemplate map) throws Exception {
         int count = 0;
+        Map<String, PendingMonsterGroup> pendingGroups = new LinkedHashMap<>();
+
         try(PreparedStatement ps = conn.prepareStatement(
                 "SELECT monster_id, grade, cell_id, orientation, qty " +
-                "FROM monster_spawns WHERE map_id=?")) {
+                "FROM monster_spawns WHERE map_id=? ORDER BY cell_id, orientation, monster_id, grade")) {
             ps.setInt(1, map.getId());
             try(ResultSet rs = ps.executeQuery()) {
-                // Regroupe par cellule — TODO : groupes de plusieurs monstres
                 while(rs.next()) {
-                    MonsterTemplate tpl   = templates.get(rs.getInt("monster_id"));
+                    MonsterTemplate tpl = templates.get(rs.getInt("monster_id"));
                     if(tpl == null) continue;
-                    int   grade       = rs.getInt("grade");
-                    short cell        = rs.getShort("cell_id");
-                    int   orientOrd   = rs.getInt("orientation");
-                    int   qty         = rs.getInt("qty");
+
+                    int grade = rs.getInt("grade");
+                    short requestedCell = rs.getShort("cell_id");
+                    int orientOrd = rs.getInt("orientation");
+                    int qty = rs.getInt("qty");
+                    if(qty <= 0) qty = 1;
 
                     EOrientation orient = EOrientation.valueOf(orientOrd);
 
-                    List<MonsterGroup.Member> members = new ArrayList<>();
-                    for(int i = 0; i < qty; i++) {
-                        members.add(new MonsterGroup.Member(tpl, grade));
+                    /*
+                     * Les lignes SQL monster_spawns représentent souvent les membres d'un
+                     * même groupe quand elles partagent la même cellule/orientation.
+                     * La v4 déplaçait chaque ligne séparément : le premier monstre occupait
+                     * la cellule naturelle, puis les suivants étaient repoussés ailleurs,
+                     * ce qui donnait des groupes à 1 monstre.
+                     * On reconstruit donc le groupe logique AVANT de chercher sa cellule.
+                     */
+                    String groupKey = requestedCell + ":" + orient.ordinal();
+                    PendingMonsterGroup pending = pendingGroups.get(groupKey);
+                    if(pending == null) {
+                        pending = new PendingMonsterGroup(requestedCell, orient);
+                        pendingGroups.put(groupKey, pending);
                     }
-                    MonsterGroup group = new MonsterGroup(map, cell, orient, members);
-                    map.addMonsterGroup(group);
-                    count++;
-                    logger.debug("MonstersData : groupe {} spawné sur map {} cellule {}",
-                        new Object[] { group.getId(), map.getId(), cell});
+
+                    for(int i = 0; i < qty; i++) {
+                        pending.members.add(new MonsterGroup.Member(tpl, grade));
+                    }
                 }
             }
         }
+
+        for(PendingMonsterGroup pending : pendingGroups.values()) {
+            Short naturalCell = map.findNearestValidMonsterCell(pending.requestedCell);
+            if(naturalCell == null) {
+                logger.warn("MonstersData : spawn ignoré sur map {} cellule {} : aucune cellule naturelle valide trouvée",
+                    map.getId(), pending.requestedCell);
+                continue;
+            }
+
+            short cell = naturalCell.shortValue();
+            if(cell != pending.requestedCell) {
+                logger.debug("MonstersData : cellule spawn déplacée naturellement sur map {} : {} -> {}",
+                    new Object[] { map.getId(), pending.requestedCell, cell });
+            }
+
+            MonsterGroup group = new MonsterGroup(map, cell, pending.orientation, pending.members);
+            map.addMonsterGroup(group);
+            count++;
+            logger.debug("MonstersData : groupe {} spawné sur map {} cellule {} ({} monstres)",
+                new Object[] { group.getId(), map.getId(), cell, group.getMembers().size() });
+        }
+
         return count;
+    }
+
+    private static final class PendingMonsterGroup {
+        private final short requestedCell;
+        private final EOrientation orientation;
+        private final List<MonsterGroup.Member> members = new ArrayList<>();
+
+        private PendingMonsterGroup(short requestedCell, EOrientation orientation) {
+            this.requestedCell = requestedCell;
+            this.orientation = (orientation != null) ? orientation : EOrientation.SOUTH;
+        }
     }
 
     // ── Accès ─────────────────────────────────────────────────────────────────

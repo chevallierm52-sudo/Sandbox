@@ -2,11 +2,8 @@ package org.dofus.constants;
 
 public class ServersInformation {
 
-	private static int requireSubscribe = 0;
-	
 	public enum Server {
-		NULL(0),
-		BOUNE(612);
+		OTOMUSTAM(22);
 		
 		public int value;
 		
@@ -60,25 +57,17 @@ public class ServersInformation {
 	    }
 	}
 	
-	public static int getRequireSubscribe() {
-		return requireSubscribe;
-	}
-
-	public static void setRequireSubscribe(int requiredSubscribe) {
-		requireSubscribe = requiredSubscribe;
-	}
-	
 	public static String get() {
-		return new StringBuilder()
-				.append("AH")
-				.append(getServerId()).append(";")
-				.append(States.ONLINE.ordinal()).append(";")
-				.append(Population.HIGH.ordinal()).append(";")
-				.append(getRequireSubscribe())
-					.toString();
+	    return new StringBuilder()
+	        .append("AH|")
+	        .append(getServerId()).append(";")
+	        .append(States.ONLINE.ordinal()).append(";")
+	        .append(Population.RECOMMENDED.ordinal()).append(";")
+	        .append(1)
+	        .toString();
 	}
 	
 	public static int getServerId() {
-		return Server.BOUNE.get();
+		return Server.OTOMUSTAM.get();
 	}
 }

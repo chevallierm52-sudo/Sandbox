@@ -250,13 +250,13 @@ public class GameScreenHandler extends GameClientHandler {
               .append(StringUtils.toHexOrNegative(character.getColor2())).append(";")
               .append(StringUtils.toHexOrNegative(character.getColor3())).append(";");
 
-            /*boolean first = true;
-            for(int accessory : character.getAccessories()){
-                if (first) first = false;
-                else sb.append(',');
-                sb.append(accessory == -1 ? "" : StringUtils.toHex(accessory));
-            }*/
-            sb.append(';');
+            // Accessoires visibles sur l'ecran de selection personnage.
+            // Meme ordre que GM/Oa en roleplay 1.29 : ,coiffe,cape,familier,arme,bouclier.
+            // L'arme reste volontairement masquee en RP pour eviter son affichage sur la map.
+            String selectionAccessories = character.getInventory() == null
+                    ? ""
+                    : character.getInventory().buildAccessories(false);
+            sb.append(selectionAccessories).append(';');
             
             sb.append("0").append(';')//sb.append(character.isStoreActive() ? '1' : '0').append(';')
             
@@ -282,7 +282,8 @@ public class GameScreenHandler extends GameClientHandler {
                     character.getSkin(),
                     character.getColor1(),
                     character.getColor2(),
-                    character.getColor3()
+                    character.getColor3(),
+                    character.getInventory().buildASKItems()
             ));
 
             client.getAccount().setConnected(true);
@@ -300,7 +301,7 @@ public class GameScreenHandler extends GameClientHandler {
 	}
 	
     public static String characterSelectionSucessMessage(long id, String name, int level, int breedId, byte breed,
-            short skin, int color1, int color2, int color3) {
+            short skin, int color1, int color2, int color3, String items) {
     	StringBuilder sb = new StringBuilder().append("ASK|");
 
         sb.append(id).append('|');
@@ -312,7 +313,7 @@ public class GameScreenHandler extends GameClientHandler {
         sb.append(StringUtils.toHexOrNegative(color1)).append('|');
         sb.append(StringUtils.toHexOrNegative(color2)).append('|');
         sb.append(StringUtils.toHexOrNegative(color3)).append('|');
-        //ItemGameMessageFormatter.formatItems(sb, items);
+        if(items != null) sb.append(items);
 
         return sb.toString();
     }

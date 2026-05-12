@@ -2,15 +2,22 @@ package org.dofus.objects.maps;
 
 import java.lang.Character;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.dofus.database.objects.InteractiveObjectCellsData;
+import org.dofus.database.objects.InteractiveObjectsData;
+import org.dofus.database.objects.MapCellWalkabilityData;
 import org.dofus.objects.actors.Characters;
 import org.dofus.objects.actors.EOrientation;
 import org.dofus.objects.actors.NPC;
 import org.dofus.objects.monsters.MonsterGroup;
+import org.dofus.utils.MapCellDecoder;
 import org.dofus.utils.StringUtils;
 
 public class MapTemplate {
@@ -25,6 +32,8 @@ public class MapTemplate {
     private String places;
 
     private final HashMap<Short, TriggerTemplate> triggers = new HashMap<>();
+    private final Map<Short, Cell> cells = new ConcurrentHashMap<>();
+    private final List<Short> preferredSpawnCells = new ArrayList<Short>();
 
     private Map<Integer, Characters>    actors        = new ConcurrentHashMap<>();
     private final Map<Integer, NPC>     npcs          = new ConcurrentHashMap<>();
@@ -41,7 +50,9 @@ public class MapTemplate {
         this.key = key;
         this.date = date;
         this.subscriberArea = subscriberArea;
-        this.places = places;     
+        this.places = places;
+        this.cells.putAll(MapCellDecoder.decode(key, date));
+        this.preferredSpawnCells.addAll(MapCellDecoder.decodePlacementCells(places));
     }
 
     public int getId() {
@@ -78,6 +89,191 @@ public class MapTemplate {
 
     public boolean isSubscriberArea() {
         return subscriberArea;
+    }
+
+
+    public Map<Short, Cell> getCells() {
+        return cells;
+    }
+
+    public Cell getCell(short cellId) {
+        return cells.get(cellId);
+    }
+
+    public boolean hasDecodedCells() {
+        return !cells.isEmpty();
+    }
+
+    /**
+     * Validation centrale d'une cellule roleplay.
+     * Quand les donnees cellules sont decodees, on refuse les cases inactives/non marchables.
+     * Quand elles ne le sont pas, on garde un fallback compatible : bornes + collisions.
+     */
+    public boolean isValidActorCell(short cellId) {
+        return isValidActorCell(cellId, true);
+    }
+
+    public boolean isValidActorCell(short cellId, boolean allowTriggers) {
+        if(!isValidCellId(cellId)) return false;
+        if(!allowTriggers && triggers.containsKey(cellId)) return false;
+        if(isBlockingInteractiveCell(cellId)) return false;
+        if(hasDecodedCells()) {
+            Cell cell = cells.get(cellId);
+            if(cell == null || !cell.isWalkable()) return false;
+        } else {
+            Boolean override = MapCellWalkabilityData.getOverride(id, cellId);
+            if(Boolean.FALSE.equals(override)) return false;
+            // Sans donnees map completes, on reste jouable : les cellules inconnues sont acceptees
+            // sauf si une collision explicite (puits, trigger interdit, occupation) les bloque.
+        }
+        return !isCellOccupied(cellId);
+    }
+
+    public boolean isBlockingInteractiveCell(short cellId) {
+        if(!isValidCellId(cellId)) return false;
+        if(InteractiveObjectCellsData.isBlocking(id, cellId)) return true;
+        if(hasDecodedCells()) {
+            Cell cell = cells.get(cellId);
+            return cell != null && cell.hasBlockingInteractiveObject();
+        }
+        return false;
+    }
+
+    public void learnWalkableCell(short cellId, String reason) {
+        if(!isValidCellId(cellId) || hasDecodedCells() || isBlockingInteractiveCell(cellId)) return;
+        MapCellWalkabilityData.markWalkable(id, cellId, reason);
+    }
+
+    /** Cellule valide pour un groupe de monstres : pas de soleil/trigger et pas trop colle aux autres groupes. */
+    public boolean isValidMonsterCell(short cellId) {
+        if(!isValidActorCell(cellId, false)) return false;
+        Cell cell = cells.get(cellId);
+        if(cell != null && !cell.isMonsterSpawnable()) return false;
+        return !isTooCloseToAnotherMonsterGroup(cellId, 3);
+    }
+
+    public boolean isCellOccupied(short cellId) {
+        for(Characters actor : actors.values()) {
+            if(actor != null && actor.getCurrentCell() == cellId) return true;
+        }
+        for(NPC npc : npcs.values()) {
+            if(npc != null && npc.getCellId() == cellId) return true;
+        }
+        for(MonsterGroup group : monsters.values()) {
+            if(group != null && group.getCell() == cellId) return true;
+        }
+        return false;
+    }
+
+    public Short findNearestValidMonsterCell(short origin) {
+        Short bestCell = null;
+        int bestScore = Integer.MAX_VALUE;
+
+        Iterable<Short> candidates = getSpawnCandidates();
+        for(Short candidate : candidates) {
+            if(candidate == null || !isValidMonsterCell(candidate)) continue;
+
+            int score = scoreMonsterSpawnCell(origin, candidate.shortValue());
+            if(score < bestScore) {
+                bestScore = score;
+                bestCell = candidate;
+            }
+        }
+        return bestCell;
+    }
+
+    private Iterable<Short> getSpawnCandidates() {
+        if(hasDecodedCells()) {
+            return new LinkedHashMap<Short, Cell>(cells).keySet();
+        }
+        java.util.List<Short> fallback = new java.util.ArrayList<Short>(560);
+        for(short i = 0; i <= 559; i++) fallback.add(i);
+        return fallback;
+    }
+
+    /**
+     * Score de placement RP des groupes.
+     * On ne choisit plus seulement la cellule numeriquement la plus proche : cela peut creer
+     * une ligne artificielle de monstres sur le bord de la map. Les cellules de placement
+     * combat de la map sont utilisees comme zones naturelles preferees, puis on elargit
+     * autour d'elles avec une penalite progressive.
+     */
+    private int scoreMonsterSpawnCell(short origin, short candidate) {
+        int preferredDistance = distanceToPreferredSpawnZone(candidate);
+
+        /*
+         * Quand map_templates.places est disponible, on privilégie fortement ces zones :
+         * ce sont les cellules vertes/bleues/rouges de placement combat, donc souvent les
+         * zones les plus naturelles et lisibles de la map. La cellule demandée en BDD ne
+         * sert alors plus qu'à garder une cohérence locale, pas à forcer le placement.
+         */
+        int score = MapCellDecoder.distance(origin, candidate);
+        if(preferredDistance >= 0) {
+            score += preferredDistance * 24;
+        }
+
+        score += edgePenalty(candidate) * 8;
+        score += crowdPenalty(candidate) * 12;
+        return score;
+    }
+
+    private int distanceToPreferredSpawnZone(short cellId) {
+        if(preferredSpawnCells.isEmpty()) return -1;
+        int best = Integer.MAX_VALUE;
+        for(Short preferred : preferredSpawnCells) {
+            if(preferred == null) continue;
+            int distance = MapCellDecoder.distance(cellId, preferred.shortValue());
+            if(distance < best) best = distance;
+        }
+        return best == Integer.MAX_VALUE ? -1 : best;
+    }
+
+    private int edgePenalty(short cellId) {
+        Point p = MapCellDecoder.toPoint(cellId);
+        int x = Math.abs(p.getX());
+        int y = Math.abs(p.getY());
+
+        int penalty = 0;
+        if(x > 28) penalty += x - 28;
+        if(y < 8) penalty += 8 - y;
+        if(y > 60) penalty += y - 60;
+        return penalty;
+    }
+
+    private int crowdPenalty(short cellId) {
+        int penalty = 0;
+        for(MonsterGroup group : monsters.values()) {
+            if(group == null) continue;
+            int distance = MapCellDecoder.distance(cellId, group.getCell());
+            if(distance < 6) penalty += 6 - distance;
+        }
+        return penalty;
+    }
+
+    public Short findNearestValidActorCell(short origin, boolean allowTriggers) {
+        Short bestCell = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for(short candidate = 0; candidate <= 559; candidate++) {
+            if(!isValidActorCell(candidate, allowTriggers)) continue;
+            int distance = MapCellDecoder.distance(origin, candidate);
+            if(distance < bestDistance) {
+                bestDistance = distance;
+                bestCell = candidate;
+            }
+        }
+        return bestCell;
+    }
+
+    private boolean isTooCloseToAnotherMonsterGroup(short cellId, int minDistance) {
+        for(MonsterGroup group : monsters.values()) {
+            if(group == null) continue;
+            if(MapCellDecoder.distance(cellId, group.getCell()) < minDistance) return true;
+        }
+        return false;
+    }
+
+    public boolean isValidCellId(short cellId) {
+        return cellId >= 0 && cellId <= 559;
     }
 
     public String getPlaces() {
@@ -230,23 +426,45 @@ public class MapTemplate {
 	    }
 
 	    private short id;
+	    private boolean active;
 	    private boolean lineOfSight;
 	    private MovementType movementType;
 	    private int groundLevel;
 	    private int groundSlope;
+	    private int layerObject1Num;
+	    private int layerObject2Num;
+	    private boolean layerObject2Interactive;
 	    private Point position;
 
 	    public Cell(short id, boolean lineOfSight, MovementType movementType, int groundLevel, int groundSlope, Point position) {
+	        this(id, true, lineOfSight, movementType, groundLevel, groundSlope, position);
+	    }
+
+	    public Cell(short id, boolean active, boolean lineOfSight, MovementType movementType, int groundLevel, int groundSlope, Point position) {
+	        this(id, active, lineOfSight, movementType, groundLevel, groundSlope, 0, 0, false, position);
+	    }
+
+	    public Cell(short id, boolean active, boolean lineOfSight, MovementType movementType, int groundLevel,
+	            int groundSlope, int layerObject1Num, int layerObject2Num, boolean layerObject2Interactive,
+	            Point position) {
 	        this.id = id;
+	        this.active = active;
 	        this.lineOfSight = lineOfSight;
 	        this.movementType = movementType;
 	        this.groundLevel = groundLevel;
 	        this.groundSlope = groundSlope;
+	        this.layerObject1Num = layerObject1Num;
+	        this.layerObject2Num = layerObject2Num;
+	        this.layerObject2Interactive = layerObject2Interactive;
 	        this.position = position;
 	    }
 
 	    public short getId() {
 	        return id;
+	    }
+
+	    public boolean isActive() {
+	        return active;
 	    }
 
 	    public boolean isLineOfSight() {
@@ -265,8 +483,40 @@ public class MapTemplate {
 	        return groundSlope;
 	    }
 
+	    public int getLayerObject1Num() {
+	        return layerObject1Num;
+	    }
+
+	    public int getLayerObject2Num() {
+	        return layerObject2Num;
+	    }
+
+	    public boolean isLayerObject2Interactive() {
+	        return layerObject2Interactive;
+	    }
+
 	    public boolean isWalkable() {
-	        return movementType != MovementType.Unwalkable;
+	        return active && movementType != MovementType.Unwalkable;
+	    }
+
+	    public boolean hasInteractiveObject() {
+	        return layerObject2Interactive && layerObject2Num > 0;
+	    }
+
+	    public boolean hasKnownInteractiveObject() {
+	        return layerObject2Num > 0 && InteractiveObjectsData.isKnown(layerObject2Num);
+	    }
+
+	    public boolean hasBlockingInteractiveObject() {
+	        return layerObject2Num > 0 && InteractiveObjectsData.isBlocking(layerObject2Num);
+	    }
+
+	    public boolean isMonsterSpawnable() {
+	        return isWalkable()
+	            && movementType != MovementType.Door
+	            && movementType != MovementType.Trigger
+	            && !hasInteractiveObject()
+	            && !hasBlockingInteractiveObject();
 	    }
 
 	    public Point getPosition() {

@@ -38,13 +38,9 @@ public class GProtocol {
 	      .append(StringUtils.toHexOrNegative(player.getColor2())).append(';')
 	      .append(StringUtils.toHexOrNegative(player.getColor3())).append(';');
 	
-	    /*boolean first = true;
-	    for (int accessory : player.getAccessories()){
-	        if (first) first = false;
-	        else sb.append(',');
-	
-	        sb.append(accessory == 0 ? "" : StringUtil.toHex(accessory));
-	    }*/
+	    if(player.getInventory() != null) {
+	        sb.append(player.getInventory().buildAccessories());
+	    }
 	    sb.append(';');
 	
 	    sb.append(player.getExperience().getLevel() >= 100 ? player.getExperience().getLevel() == 200 ? '2' : '1' : '0');

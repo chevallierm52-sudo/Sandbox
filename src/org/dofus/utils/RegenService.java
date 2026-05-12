@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.mina.core.session.IoSession;
 import org.dofus.objects.WorldData;
 import org.dofus.objects.actors.Characters;
+import org.dofus.objects.characters.Statistic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +40,10 @@ public class RegenService {
     private static final int START_DELAY_SEC = 10;
 
     /** Intervalle entre chaque tick de regen (secondes). */
-    private static final int TICK_SEC = 2;
+    private static final int TICK_SEC = 1;
+
+    /** PV regagnes par tick en regeneration passive normale. */
+    private static final short REGEN_PER_TICK = 1;
 
     private static final ScheduledExecutorService scheduler =
         Executors.newScheduledThreadPool(2, r -> {
@@ -50,6 +54,7 @@ public class RegenService {
 
     /** characterId → future du tick de regen */
     private static final Map<Integer, ScheduledFuture<?>> regens = new ConcurrentHashMap<>();
+    private static final Map<Integer, String> lastStatsPackets = new ConcurrentHashMap<>();
 
     // ── API publique ──────────────────────────────────────────────────────────
 
@@ -58,6 +63,11 @@ public class RegenService {
      * Le personnage doit être connecté et hors combat.
      */
     public static void start(Characters character) {
+        if(character == null || character.getLife() >= character.getLifeMax()) {
+            stop(character);
+            return;
+        }
+        if(regens.containsKey(character.getId())) return;
         stop(character); // annule toute regen en cours
 
         ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(
@@ -81,6 +91,21 @@ public class RegenService {
     }
 
     /** Arrête toutes les régens et shutdown le scheduler. */
+    public static void refresh(Characters character) {
+        refresh(character, session(character));
+    }
+
+    public static void refresh(Characters character, IoSession session) {
+        if(character == null) return;
+        short maxLife = character.getLifeMax();
+        if(character.getLife() > maxLife) character.setLife(maxLife);
+        if(session != null && session.isConnected()) {
+            writeStatsIfChanged(character, session);
+        }
+        if(character.getLife() < maxLife) start(character);
+        else stop(character);
+    }
+
     public static void shutdown() {
         for(ScheduledFuture<?> f : regens.values()) f.cancel(false);
         regens.clear();
@@ -103,16 +128,14 @@ public class RegenService {
                 return;
             }
 
-            // PV regagnés par tick : max(1, floor(maxLife / 10)) par tranche de 2 secondes
-            short regen = (short) Math.max(1, maxLife / 10);
+            short regen = REGEN_PER_TICK;
             short newLife = (short) Math.min(maxLife, currentLife + regen);
             character.setLife(newLife);
 
             // Notifie le client
-            IoSession session = WorldData.getSessionByAccount().get(character.getOwner());
+            IoSession session = session(character);
             if(session != null && session.isConnected()) {
-                // Paquet de mise à jour vie — TODO : vérifier format exact
-                session.write("AS" + newLife + "~" + maxLife);
+                writeStatsIfChanged(character, session);
             }
 
             if(newLife >= maxLife) {
@@ -122,5 +145,16 @@ public class RegenService {
             logger.warn("RegenService tick error for {}: {}", character.getName(), e.getMessage());
             stop(character);
         }
+    }
+
+    private static IoSession session(Characters character) {
+        if(character == null) return null;
+        return WorldData.getSessionByAccount().get(character.getOwner());
+    }
+
+    private static void writeStatsIfChanged(Characters character, IoSession session) {
+        String packet = Statistic.getStatisticsMessage(character);
+        String previous = lastStatsPackets.put(character.getId(), packet);
+        if(!packet.equals(previous)) session.write(packet);
     }
 }

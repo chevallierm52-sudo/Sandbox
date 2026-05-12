@@ -256,8 +256,9 @@ public class Characters implements IActor {
 	}
 
 	public short getLifeMax() {
-		return (short) (getBreed().getLife() + 5 * (getExperience().getLevel() - 1)
-				+ getStats().getEffect(EConstants.ADD_VITALITY.getInt()));
+		int baseLife = Math.max(55, getBreed().getLife());
+		return (short) (baseLife + 5 * (getExperience().getLevel() - 1)
+				+ Statistic.totalWithEquipment(this, EConstants.ADD_VITALITY.getInt()));
 	}
 
 	public short getEnergy() {
@@ -290,6 +291,7 @@ public class Characters implements IActor {
 
 	public void setStats(Statistic stats) {
 		this.stats = stats;
+		if(this.stats != null) this.stats.ensureDefaults(this);
 	}
 
 	public short getStatsPoint() {
@@ -397,7 +399,9 @@ public class Characters implements IActor {
 	}
 
 	public short getMaxPods() {
-		return (short) (1000 + getStats().getEffect(EConstants.ADD_STRENGTH.getInt()) * 5);
+		int strength = Statistic.totalWithEquipment(this, EConstants.ADD_STRENGTH.getInt());
+		int bonusPods = Statistic.equipmentBonus(this, EConstants.ADD_WEIGHT.getInt());
+		return (short) (1000 + strength * 5 + bonusPods);
 	}
 
 	public String parseParty()

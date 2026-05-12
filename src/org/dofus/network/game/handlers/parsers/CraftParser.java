@@ -178,7 +178,10 @@ public class CraftParser {
         int resultQty   = recipe.getResultQty() * qty;
         ItemTemplate resultTpl = ItemsData.getTemplate(resultTplId);
         if(resultTpl != null) {
+            Item stacked = findStackable(inv, resultTpl);
             Item newItem = inv.addItem(resultTpl, resultQty);
+            if(stacked != null && stacked.getUid() == newItem.getUid()) ItemsData.update(newItem);
+            else ItemsData.insert(character.getId(), newItem);
             session.write(Inventory.buildOAPacket(newItem));
         }
         session.write("MC+" + resultTplId + "|" + resultQty);
@@ -240,11 +243,19 @@ public class CraftParser {
                 session.write(Inventory.buildORPacket(item.getUid()));
                 ItemsData.delete(item.getUid());
             } else {
-                session.write(Inventory.buildOMPacket(item));
+                session.write(Inventory.buildOQPacket(item));
                 ItemsData.update(item);
             }
             remaining -= take;
             if(remaining <= 0) break;
         }
+    }
+
+    private static Item findStackable(Inventory inv, ItemTemplate template) {
+        if(template.getTypeId() < 48) return null;
+        for(Item item : inv.getBag()) {
+            if(item.getTemplate().getId() == template.getId()) return item;
+        }
+        return null;
     }
 }

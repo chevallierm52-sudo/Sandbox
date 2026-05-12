@@ -101,10 +101,38 @@ public class BotAIService {
         }, 0L, TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * Demande un avis court a ChatGPT pour une decision combat.
+     * Retourne null si OpenAI est desactive ou rate-limit, afin de garder
+     * la decision heuristique locale comme source principale.
+     */
+    public static void getCombatAdvice(Characters bot, BotPersonality personality,
+                                       String context, Consumer<String> callback) {
+        if(!enabled || isRateLimited(bot.getId())) {
+            callback.accept(null);
+            return;
+        }
+
+        lastCall.put(bot.getId(), System.currentTimeMillis());
+        BotBehavior.schedule(() -> {
+            String response = null;
+            try {
+                response = callOpenAI(buildCombatBody(bot.getName(), personality, context));
+            } catch(Exception e) {
+                logger.warn("OpenAI combat advice failed for bot {}: {}", bot.getName(), e.getMessage());
+            }
+            callback.accept(response);
+        }, 0L, TimeUnit.MILLISECONDS);
+    }
+
     // ── Appel HTTP OpenAI ─────────────────────────────────────────────────────
 
     private static String callOpenAI(String botName, BotPersonality personality,
                                      String context) throws Exception {
+        return callOpenAI(buildBody(botName, personality, context));
+    }
+
+    private static String callOpenAI(String body) throws Exception {
         URL url = new URL("https://api.openai.com/v1/chat/completions");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
@@ -114,7 +142,6 @@ public class BotAIService {
         conn.setConnectTimeout(5_000);
         conn.setReadTimeout(10_000);
 
-        String body = buildBody(botName, personality, context);
         try(OutputStream os = conn.getOutputStream()) {
             os.write(body.getBytes("UTF-8"));
         }
@@ -149,6 +176,23 @@ public class BotAIService {
             + "],"
             + "\"max_tokens\":80,"
             + "\"temperature\":0.85"
+            + "}";
+    }
+
+    private static String buildCombatBody(String botName, BotPersonality personality, String context) {
+        String systemPrompt = "Tu es le moteur tactique d'un bot Dofus 1.29. "
+            + "Tu dois choisir si le bot peut raisonnablement battre le groupe. "
+            + "Personnalite du bot : " + personalityDesc(personality) + ". "
+            + "Reponds uniquement par FIGHT ou AVOID, puis une raison tres courte.";
+
+        return "{"
+            + "\"model\":\"" + model + "\","
+            + "\"messages\":["
+            +   "{\"role\":\"system\",\"content\":\"" + escapeJson(systemPrompt) + "\"},"
+            +   "{\"role\":\"user\",\"content\":\"" + escapeJson(context) + "\"}"
+            + "],"
+            + "\"max_tokens\":40,"
+            + "\"temperature\":0.2"
             + "}";
     }
 

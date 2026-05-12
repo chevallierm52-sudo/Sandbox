@@ -73,7 +73,19 @@ public class MapRespawnService {
         try {
             // Crée un nouveau groupe avec le même template de composition
             int newId = GROUP_ID_GEN.getAndIncrement();
-            MonsterGroup newGroup = new MonsterGroup(newId, original.getCell(), original.getOrientation());
+            short requestedCell = original.getCell();
+            Short naturalCell = map.findNearestValidMonsterCell(requestedCell);
+            if(naturalCell == null) {
+                logger.warn("Respawn ignoré sur map {} cellule {} : aucune cellule naturelle valide trouvée",
+                    map.getId(), requestedCell);
+                return;
+            }
+            MonsterGroup newGroup = new MonsterGroup(newId, naturalCell.shortValue(), original.getOrientation());
+
+            if(naturalCell.shortValue() != requestedCell) {
+                logger.debug("Respawn déplacé naturellement sur map {} : {} -> {}",
+                    new Object[] { map.getId(), requestedCell, naturalCell });
+            }
 
             // Copie les membres (même monstres, mêmes grades, PV restaurés)
             for(MonsterGroup.MonsterEntry entry : original.getMembers()) {

@@ -53,7 +53,7 @@ public class BotAI {
 		    { "Alynmos", 844, (short) 360, (byte) 4, (byte) 0, 0x212529, 0x495057, 0xADB5BD, (short) 112, BotPersonality.MERCHANT }, // Sram M
 		    { "Alynrune", 11210, (short) 380, (byte) 5, (byte) 1, 0xFF9F1C, 0xFFBF69, 0xCBF3F0, (short) 67, BotPersonality.SOCIAL }, // Xelor F
 		    { "Alynvex", 4263, (short) 210, (byte) 7, (byte) 0, 0x606C38, 0xDDA15E, 0xBC6C25, (short) 43, BotPersonality.WARRIOR }, // Iop M
-		    { "Alyndros", 3022, (short) 230, (byte) 12, (byte) 1, 0x2EC4B6, 0xE9C46A, 0xF4A261, (short) 88, BotPersonality.EXPLORER }, // Pandawa F
+/**		    { "Alyndros", 3022, (short) 230, (byte) 12, (byte) 1, 0x2EC4B6, 0xE9C46A, 0xF4A261, (short) 88, BotPersonality.EXPLORER }, // Pandawa F
 		    { "Alynlune", 6855, (short) 400, (byte) 1, (byte) 0, 0x8338EC, 0x3A86FF, 0xFFBE0B, (short) 29, BotPersonality.MERCHANT }, // Feca M
 		    { "Alynmir", 6137, (short) 270, (byte) 3, (byte) 1, 0xC84B00, 0xFFD700, 0x5A3E2B, (short) 50, BotPersonality.SOCIAL }, // Eniripsa F
 		    { "Alyndane", 3250, (short) 300, (byte) 8, (byte) 0, 0x1A1A2E, 0xE94560, 0x0F3460, (short) 78, BotPersonality.EXPLORER }, // Cra M
@@ -743,7 +743,8 @@ public class BotAI {
 		    { "Fendra", 8785, (short) 360, (byte) 4, (byte) 0, 0x212529, 0x495057, 0xADB5BD, (short) 112, BotPersonality.MERCHANT }, // Sram M
 		    { "Fendmon", 7411, (short) 380, (byte) 5, (byte) 1, 0xFF9F1C, 0xFFBF69, 0xCBF3F0, (short) 67, BotPersonality.SOCIAL }, // Xelor F
 		    { "Fendriel", 6954, (short) 210, (byte) 7, (byte) 0, 0x606C38, 0xDDA15E, 0xBC6C25, (short) 43, BotPersonality.WARRIOR }, // Iop M
-		};
+		**/
+		    };
 
 	/** Retourne la personnalité d'un bot, ou null si inconnu. */
 	public static BotPersonality getPersonality(int botId) {
@@ -845,6 +846,10 @@ public class BotAI {
 
 		bot.setStats(new Statistic(bot));
 		bot.setConnected(true);
+
+		// Donne aux bots un équipement cohérent avec leur niveau/classe.
+		// L'inventaire reste temporaire : pas d'INSERT SQL pour ces bots éphémères.
+		BotEquipmentService.equipForLevelAndBreed(bot);
 
 		bot.getCurrentMap().addActor(bot);
 		WorldData.addCharacterById(bot, bot.getId());

@@ -58,6 +58,19 @@ public class CharacterExperience extends AExperience {
 	@Override
 	public void onLevelDown(long exp) {}
 
+
+	/**
+	 * Fixe directement le niveau du personnage pour les commandes GM/debug.
+	 * L'XP est recalée sur le seuil minimum officiel du niveau.
+	 */
+	public void setLevel(short newLevel) {
+		if(newLevel < 1) newLevel = 1;
+		if(newLevel > 200) newLevel = 200;
+		this.level = newLevel;
+		this.template = ExperiencesData.get(newLevel);
+		this.experience = this.template != null ? this.template.getCharacter() : 0;
+	}
+
 	@Override public long min()           { return template.getCharacter(); }
 	@Override public long max()           { Experience next = ExperiencesData.get((short)(level+1)); return next != null ? next.getCharacter() : Long.MAX_VALUE; }
 	@Override public short getLevel()     { return level; }

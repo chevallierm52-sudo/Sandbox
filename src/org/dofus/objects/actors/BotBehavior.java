@@ -61,12 +61,15 @@ public class BotBehavior {
 
     /** État FSM courant par bot (botId → état). */
     private static final Map<Integer, BotState> states = new ConcurrentHashMap<>();
+    private static final Map<Integer, Short> targetTriggerCells = new ConcurrentHashMap<>();
+    private static final Map<Integer, Long> movingUntil = new ConcurrentHashMap<>();
 
     private enum BotState { WANDERING, EXPLORING }
 
     // ── Démarrage ─────────────────────────────────────────────────────────────
 
     public static void start(Characters bot) {
+        BotPathMemory.init();
         states.put(bot.getId(), BotState.WANDERING);
         BotSocial.updateLocation(bot.getId(), bot.getCurrentMap().getId());
 
@@ -83,7 +86,9 @@ public class BotBehavior {
 
     private static void scheduleMoves(Characters bot) {
         try {
-            tick(bot);
+            if(!isMoving(bot)) {
+                tick(bot);
+            }
         } catch(Exception e) {
             logger.warn("Bot {} move error: {}", bot.getName(), e.getMessage());
         }
@@ -100,14 +105,16 @@ public class BotBehavior {
         if(personality == null) personality = BotPersonality.SOCIAL;
 
         BotState state = states.getOrDefault(bot.getId(), BotState.WANDERING);
+        BotMonsterStrategy.Decision monsterDecision = BotMonsterStrategy.inspectMap(bot, personality);
 
         // Décision de l'état pour ce tick
         boolean hasTriggers = !bot.getCurrentMap().getTriggers().isEmpty();
         boolean wantsExplore = hasTriggers && Math.random() < personality.getExploreWeight();
+        boolean wantsLeaveDanger = hasTriggers && monsterDecision != null && !monsterDecision.isFavorable();
 
-        if(state == BotState.EXPLORING || wantsExplore) {
+        if(state == BotState.EXPLORING || wantsExplore || wantsLeaveDanger) {
             states.put(bot.getId(), BotState.EXPLORING);
-            doExploreMove(bot, personality);
+            doTriggerMove(bot, personality);
         } else {
             states.put(bot.getId(), BotState.WANDERING);
             doWanderMove(bot);
@@ -133,8 +140,32 @@ public class BotBehavior {
 
     // ── Exécution d'un mouvement ──────────────────────────────────────────────
 
+    private static void doTriggerMove(Characters bot, BotPersonality personality) {
+        MapTemplate map = bot.getCurrentMap();
+        if(map == null || map.getTriggers().isEmpty()) {
+            doExploreMove(bot, personality);
+            return;
+        }
+
+        Short targetCell = targetTriggerCells.get(bot.getId());
+        if(targetCell == null || !map.getTriggers().containsKey(targetCell)) {
+            TriggerTemplate trigger = BotPathMemory.chooseTrigger(bot, personality);
+            if(trigger == null) {
+                doExploreMove(bot, personality);
+                return;
+            }
+            targetCell = trigger.getCellId();
+            targetTriggerCells.put(bot.getId(), targetCell);
+        }
+
+        executeMoveTowardCell(bot, targetCell, true);
+    }
+
     private static void executeMove(Characters bot, int orientOrdinal, int cellOffset,
                                     int steps, boolean exploring) {
+        MapTemplate map = bot.getCurrentMap();
+        if(map == null) return;
+
         short currentCell = bot.getCurrentCell();
         short targetCell  = (short)(currentCell + cellOffset * steps);
 
@@ -153,21 +184,29 @@ public class BotBehavior {
         path.append(Cell.encode(currentCell));
 
         short cell = currentCell;
+        int actualSteps = 0;
         for(int i = 0; i < steps; i++) {
-            cell = (short)(cell + cellOffset);
+            short nextCell = (short)(cell + cellOffset);
+            if(!map.isValidActorCell(nextCell, exploring)) break;
+            cell = nextCell;
             path.append(StringUtils.HASH.charAt(orientOrdinal));
             path.append(Cell.encode(cell));
+            actualSteps++;
         }
+
+        if(actualSteps == 0) return;
 
         final short        finalCell   = cell;
         final EOrientation finalOrient = EOrientation.valueOf(orientOrdinal);
 
         broadcastToMap(bot, "GA1;1;" + bot.getId() + ";" + path);
 
-        long animMs = steps * 300L;
+        long animMs = estimateWalkTimeMs(actualSteps);
+        movingUntil.put(bot.getId(), System.currentTimeMillis() + animMs);
         scheduler.schedule(() -> {
             bot.setCurrentCell(finalCell);
             bot.setCurrentOrientation(finalOrient);
+            movingUntil.remove(bot.getId());
 
             TriggerTemplate trigger = bot.getCurrentMap().getTriggers().get(finalCell);
             if(trigger != null) {
@@ -181,6 +220,87 @@ public class BotBehavior {
     /**
      * Exécute un changement de map pour un bot (trigger naturel ou suivi d'ami).
      */
+    private static void executeMoveTowardCell(Characters bot, short targetCell, boolean exploring) {
+        short currentCell = bot.getCurrentCell();
+        if(currentCell == targetCell) {
+            TriggerTemplate trigger = bot.getCurrentMap().getTriggers().get(targetCell);
+            if(trigger != null) botChangeMap(bot, trigger);
+            return;
+        }
+
+        StringBuilder path = new StringBuilder("a");
+        path.append(Cell.encode(currentCell));
+
+        short cell = currentCell;
+        EOrientation finalOrient = bot.getCurrentOrientation();
+        int steps = 0;
+        for(int i = 0; i < 120 && cell != targetCell; i++) {
+            int[] step = bestStep(cell, targetCell);
+            if(step == null) break;
+            short nextCell = (short)(cell + step[1]);
+            if(nextCell < 0 || nextCell > CELL_MAX) break;
+            if(!bot.getCurrentMap().isValidActorCell(nextCell, true)) break;
+            cell = nextCell;
+            finalOrient = EOrientation.valueOf(step[0]);
+            path.append(StringUtils.HASH.charAt(step[0]));
+            path.append(Cell.encode(cell));
+            steps++;
+        }
+
+        if(steps == 0) {
+            targetTriggerCells.remove(bot.getId());
+            doWanderMove(bot);
+            return;
+        }
+
+        final short finalCell = cell;
+        final EOrientation orientation = finalOrient;
+        broadcastToMap(bot, "GA1;1;" + bot.getId() + ";" + path);
+
+        long animMs = estimateWalkTimeMs(steps);
+        movingUntil.put(bot.getId(), System.currentTimeMillis() + animMs);
+        scheduler.schedule(() -> {
+            bot.setCurrentCell(finalCell);
+            bot.setCurrentOrientation(orientation);
+            movingUntil.remove(bot.getId());
+
+            TriggerTemplate trigger = bot.getCurrentMap().getTriggers().get(finalCell);
+            if(trigger != null) {
+                botChangeMap(bot, trigger);
+            }
+        }, animMs, TimeUnit.MILLISECONDS);
+    }
+
+    private static int[] bestStep(short from, short target) {
+        int[] best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for(int[] dir : MOVE_DIRS) {
+            int next = from + dir[1];
+            if(next < 0 || next > CELL_MAX) continue;
+            int distance = Math.abs(target - next);
+            if(distance < bestDistance) {
+                bestDistance = distance;
+                best = dir;
+            }
+        }
+        return best;
+    }
+
+    private static boolean isMoving(Characters bot) {
+        Long until = movingUntil.get(bot.getId());
+        if(until == null) return false;
+        if(System.currentTimeMillis() >= until) {
+            movingUntil.remove(bot.getId());
+            return false;
+        }
+        return true;
+    }
+
+    private static long estimateWalkTimeMs(int steps) {
+        if(steps <= 0) return 0L;
+        return Math.max(650L, 320L * steps + 250L);
+    }
+
     static void botChangeMap(Characters bot, TriggerTemplate trigger) {
         MapTemplate nextMap = MapsData.findById(trigger.getNextMap());
         if(nextMap == null) {
@@ -191,6 +311,9 @@ public class BotBehavior {
 
         int fromMapId = bot.getCurrentMap().getId();
         BotPersonality personality = BotAI.getPersonality(bot.getId());
+        if(personality == null) personality = BotPersonality.SOCIAL;
+        BotPathMemory.observeMove(fromMapId, trigger);
+        targetTriggerCells.remove(bot.getId());
 
         // Annonce si en mode exploration
         if(states.getOrDefault(bot.getId(), BotState.WANDERING) == BotState.EXPLORING
@@ -211,6 +334,7 @@ public class BotBehavior {
         // 3. Ajoute à la nouvelle map
         nextMap.addActor(bot);
         BotSocial.updateLocation(bot.getId(), nextMap.getId());
+        BotMonsterStrategy.inspectMap(bot, personality);
 
         StringBuilder gm = new StringBuilder("GM|+");
         GProtocol.getCharacterPattern(gm, bot);
@@ -236,6 +360,7 @@ public class BotBehavior {
      * Pas d'annonce d'exploration, place directement sur la cible.
      */
     public static void performMapChange(Characters bot, MapTemplate targetMap, short targetCell) {
+        targetTriggerCells.remove(bot.getId());
         broadcastToMap(bot, "GM|-" + bot.getId());
         bot.getCurrentMap().removeActor(bot);
 

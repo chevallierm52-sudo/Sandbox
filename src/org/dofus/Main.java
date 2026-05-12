@@ -15,6 +15,7 @@ import org.dofus.objects.actors.BotAI;
 import org.dofus.objects.actors.BotAIService;
 import org.dofus.objects.actors.BotBehavior;
 import org.dofus.objects.actors.BotLearning;
+import org.dofus.objects.actors.BotPathMemory;
 import org.dofus.game.fight.DropTable;
 import org.dofus.utils.DeferredSaveService;
 import org.dofus.utils.MapRespawnService;
@@ -69,8 +70,9 @@ public class Main {
 		// ── Système IA bots ────────────────────────────────────────────────────
 		BotAIService.configure(config);   // configure OpenAI (désactivé par défaut)
 		BotLearning.init();               // charge bot_memory.csv
+		BotPathMemory.init();             // charge bot_paths.csv
 		try {
-			BotAI.spawnAll();
+			//BotAI.spawnAll();
 		} catch(Exception e) {
 			logger.error("Failed to spawn bots: {}", e.getMessage());
 		}
@@ -81,6 +83,7 @@ public class Main {
 
 	public static void stop() {
 		BotLearning.shutdown();
+		BotPathMemory.shutdown();
 		BotBehavior.shutdown();
 		DeferredSaveService.shutdown();
 		MapRespawnService.shutdown();

@@ -10,6 +10,9 @@ import org.dofus.objects.actors.NPC;
 import org.dofus.objects.monsters.MonsterGroup;
 import org.dofus.objects.characters.Statistic;
 import org.dofus.objects.maps.MapTemplate;
+import org.dofus.objects.items.GroundItem;
+import org.dofus.utils.GroundItemService;
+import org.dofus.utils.InteractiveObjectService;
 import org.apache.mina.core.session.IoSession;
 import org.dofus.game.actions.IGameAction.ActionTypeEnum;
 import org.dofus.game.actions.IGameAction.GameActionType;
@@ -22,25 +25,112 @@ public class GameParser {
 
 	public static void action(IoSession session, GameClient client, String packet) {
 		if(packet.length() < 5) {
-			session.write("BN");
+			sendActionCancel(session);
 			return;
 		}
-    	switch(ActionTypeEnum.valueOf(Integer.parseInt(packet.substring(2, 5)))){
+        ActionTypeEnum actionType = ActionTypeEnum.valueOf(Integer.parseInt(packet.substring(2, 5)));
+        if(actionType == null) {
+            logger.warn("Unknown actionType for parseGamePacket: {}", packet);
+            return;
+        }
+        switch(actionType){
         case MOVEMENT:
-            if(client.isBusy())
-                session.write("BN");
-            else {
-                RolePlayMovement movement = new RolePlayMovement(packet.substring(5), client);
-                client.getActions().push(movement);
-
-                movement.begin();
+            if(client.isBusy()) {
+                if(!client.getActions().isEmpty()
+                        && client.getActions().peek().getActionType() == GameActionType.MOVEMENT) {
+                    // Sécurité anti-blocage : un nouveau GA001 alors qu'une ancienne marche est
+                    // encore en pile signifie presque toujours que le serveur a gardé une action
+                    // morte (ex: BaM/changement de carte avant GKK). On la purge et on traite
+                    // le nouveau déplacement.
+                    client.getActions().clear();
+                } else {
+                    sendActionCancel(session);
+                    break;
+                }
             }
+
+            RolePlayMovement movement = new RolePlayMovement(packet.substring(5), client);
+            if(!movement.isValid()) {
+                sendActionCancel(session);
+                return;
+            }
+            client.getActions().push(movement);
+
+            movement.begin();
+            break;
+        case MAP_ACTION:
+            handleMapAction(session, client, packet.substring(5));
+            break;
+        case FIGHT_AGGRESSION:
+            handleFightAggression(session, client, packet.substring(5));
             break;
 		default:
 			logger.warn("Unknown actionType for parseGamePacket: {}", packet);
 			break;
 		}
 	}
+
+    private static void handleMapAction(IoSession session, GameClient client, String args) {
+        if(client == null || client.getCharacter() == null || args == null || args.isEmpty()) {
+            sendActionCancel(session);
+            return;
+        }
+
+        String[] parts = args.split(";");
+        try {
+            short cellId = Short.parseShort(parts[0]);
+            int skillId = parts.length > 1 ? Integer.parseInt(parts[1]) : -1;
+
+            if(client.isBusy() && !client.getActions().isEmpty()
+                    && client.getActions().peek().getActionType() == GameActionType.MOVEMENT) {
+                ((RolePlayMovement) client.getActions().peek()).queueMapAction(cellId, skillId);
+                return;
+            }
+            if(client.isBusy()) {
+                session.write("BN");
+                return;
+            }
+
+            if(GroundItemService.pickup(client.getCharacter(), session, cellId)) {
+                return;
+            }
+
+            if(!InteractiveObjectService.use(client.getCharacter(), session, cellId, skillId)) {
+                logger.debug("GA500 ignore : aucune action sur cell={} args={}", cellId, args);
+            }
+        } catch(NumberFormatException e) {
+            session.write("BN");
+        }
+    }
+
+    private static void handleFightAggression(IoSession session, GameClient client, String args) {
+        if(args == null || args.isEmpty()) {
+            session.write("BN");
+            return;
+        }
+        try {
+            attackMonsterGroup(session, client, Integer.parseInt(args.split(";")[0]));
+        } catch(NumberFormatException e) {
+            session.write("BN");
+        }
+    }
+
+    public static void attackMonsterGroup(IoSession session, GameClient client, int groupId) {
+        if(client == null || client.getCharacter() == null) {
+            if(session != null) session.write("BN");
+            return;
+        }
+        if(client.isBusy()) {
+            if(!client.getActions().isEmpty()
+                    && client.getActions().peek().getActionType() == GameActionType.MOVEMENT) {
+                ((RolePlayMovement) client.getActions().peek()).queueFight(groupId);
+            } else if(session != null) {
+                session.write("BN");
+            }
+            return;
+        }
+        FightParser.initiateFightVsMonsters(client.getCharacter(), session, groupId);
+    }
 
 	public static void creation(Characters character, IoSession session) {
 		session.write("GCK|1|");
@@ -57,6 +147,10 @@ public class GameParser {
 	//FIXME BOT MOUVEMENT : c'es
 	public static void information(Characters character, IoSession session, GameClient client, MapTemplate map) {
 		MonstersData.spawnAll(map); //FIXME On spawn le groupe de monstre seulement map/map ça va pas... FAUT Chargé toute les maps concernant un groupe de monstre dessus, le reste des map on le garde en lazy-loading
+        if(!map.isValidActorCell(character.getCurrentCell())) {
+            Short safeCell = map.findNearestValidActorCell(character.getCurrentCell(), true);
+            if(safeCell != null) character.setCurrentCell(safeCell.shortValue());
+        }
 		if(map.getActor(character.getId()) == null)
 	    	map.addActor(character);
 
@@ -84,6 +178,11 @@ public class GameParser {
 	    }
 
 	    session.write(allActors.toString());
+
+        // Objets deja deposes au sol sur cette carte.
+        for(GroundItem groundItem : GroundItemService.getForMap(map.getId())) {
+            session.write(groundItem.toGDOPacket());
+        }
 	 
 	    StringBuilder newActor = new StringBuilder("GM|+");
 	    GProtocol.getCharacterPattern(newActor, character);
@@ -120,9 +219,25 @@ public class GameParser {
             if(client.getActions().peek().getActionType() != GameActionType.MOVEMENT)
                 throw new Exception("invalid action : peeked action isn't a movement");
 
-            short cellId = (args.length() >= 3) ? Short.parseShort(args.substring(2)) : client.getCharacter().getCurrentCell();
+            short cellId = parseCancelCell(args, client.getCharacter().getCurrentCell());
             ((RolePlayMovement) client.getActions().pop()).cancel(cellId);
         }
 	}
+
+    private static short parseCancelCell(String args, short fallback) {
+        if(args == null || args.isEmpty()) return fallback;
+        int separator = args.indexOf('|');
+        String cell = separator >= 0 ? args.substring(separator + 1) : args;
+        if(cell.isEmpty()) return fallback;
+        try {
+            return Short.parseShort(cell);
+        } catch(NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private static void sendActionCancel(IoSession session) {
+        if(session != null) session.write("GA;0");
+    }
 
 }

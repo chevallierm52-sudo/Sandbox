@@ -1,0 +1,99 @@
+packet_envoye;raw_envoye;categorie;id_message;cle_lang;texte_fr;params_detectes;nb_usages;fichiers_lignes
+Im02;02;INFOS;2;INFOS_2;Tu as appris le métier <b>%1</b>.;1;1;objects/Personnage.java:3197
+Im03;03;INFOS;3;INFOS_3;Tu as appris le sort <b>%1</b>.;1;1;objects/Personnage.java:2102
+Im06;06;INFOS;6;INFOS_6;Position sauvegardée.;;1;objects/Carte.java:1035
+Im018;018;INFOS;18;INFOS_18;%1 vous a mis à la porte de sa maison...;1;1;objects/House.java:572
+Im020;020;INFOS;20;INFOS_20;Tu as dû donner %1 kamas pour pouvoir accéder à ce coffre.;1;2;objects/Action.java:83 | objects/Action.java:93
+Im021;021;INFOS;21;INFOS_21;Tu as obtenu %1 '<b>%2</b>'.;1,2;1;objects/Action.java:177
+Im022;022;INFOS;22;INFOS_22;Tu as perdu %1 '%2'.;1,2;1;objects/Action.java:180
+Im024;024;INFOS;24;INFOS_24;Tu viens de mémoriser un nouveau zaap.;;1;objects/Personnage.java:3643
+Im025;025;INFOS;25;INFOS_25;Votre familier vous fait la fête!;;2;objects/PetsEntry.java:329 | objects/Personnage.java:923
+Im026;026;INFOS;26;INFOS_26;Vous donnez à manger à votre familier alors qu'il n'avait plus faim. Il se force pour vous faire plaisir;;1;objects/PetsEntry.java:186
+Im027;027;INFOS;27;INFOS_27;Vous donnez à manger à répétition à votre familier déjà obèse. Il avale quand même la ressource et fait une indigestion.;;1;objects/PetsEntry.java:192
+Im029;029;INFOS;29;INFOS_29;Vous donnez à manger à votre familier. Il semble qu'il avait très faim.;;1;objects/PetsEntry.java:177
+Im032;032;INFOS;32;INFOS_32;Votre familier apprécie le repas.;;4;objects/PetsEntry.java:217 | objects/PetsEntry.java:397 | objects/PetsEntry.java:407 | objects/PetsEntry.java:424
+Im034;034;INFOS;34;INFOS_34;Tu as perdu <b>%1</b> points d'énergie.;1;4;objects/Fight.java:3381 | objects/Fight.java:3776 | objects/Fight.java:3945 | objects/Fight.java:4077
+Im036;036;INFOS;36;INFOS_36;%1 vient de rejoindre le combat en spectateur.;1;1;objects/Fight.java:4299
+Im037;037;INFOS;37;INFOS_37;Vous êtes désormais considéré comme absent.;;1;game/GameThread.java:3537
+Im038;038;INFOS;38;INFOS_38;Vous n'êtes plus considéré comme absent.;;1;game/GameThread.java:3530
+Im039;039;INFOS;39;INFOS_39;<b>%1</b> a activé le mode 'spectateur'.;1;1;objects/Fight.java:2239
+Im040;040;INFOS;40;INFOS_40;<b>%1</b> a désactivé le mode 'spectateur'.;1;1;objects/Fight.java:2239
+Im047;047;INFOS;47;INFOS_47;Ton mariage avec %1 a été annulé.;1;1;objects/Personnage.java:3828
+Im048;048;INFOS;48;INFOS_48;Le mariage entre %1 et %2 a été annulé.;1,2;1;common/World.java:1582
+Im050;050;INFOS;50;INFOS_50;Vous êtes maintenant en mode invisible.;;1;game/GameThread.java:3549
+Im051;051;INFOS;51;INFOS_51;Vous n'êtes plus en mode invisible.;;1;game/GameThread.java:3544
+Im058;058;INFOS;58;INFOS_58;Vous ne pouvez pas mettre plus d'objets en vente actuellement...;;1;game/GameThread.java:2630
+Im065;065;INFOS;65;INFOS_65;Votre compte en banque a été crédité de <b>%1</b> kamas suite à la vente de <b>%4</b> '<b>%3</b>'.;1,3,4;1;game/GameThread.java:2270
+Im068;068;INFOS;68;INFOS_68;Lot de <b>%1 '%2'</b> acheté pour <b>%3</b> kamas.;1,2,3;1;game/GameThread.java:2275
+Im076;076;INFOS;76;INFOS_76;Tu as perdu <b>%1</b> points d' honneur.;1;3;objects/Fight.java:3799 | objects/Fight.java:3968 | objects/Fight.java:4100
+Im080;080;INFOS;80;INFOS_80;Vous gagnez %1 points d'honneur en récompense de votre bravoure.;1;1;objects/Personnage.java:3580
+Im081;081;INFOS;81;INFOS_81;Vous perdez %1 points d'honneur suite à cette défaite.;1;1;objects/Personnage.java:3593
+Im082;082;INFOS;82;INFOS_82;Votre bravoure vous a fait grimper au rang %1.;1;1;objects/Personnage.java:3584
+Im083;083;INFOS;83;INFOS_83;Vous avez été dégradé au rang %1.;1;1;objects/Personnage.java:3597
+Im084;084;INFOS;84;INFOS_84;Vous êtes sanctionné par %1 point(s) de déshonneur pour ce combat déshonorant;1;1;game/GameThread.java:4151
+Im093;093;INFOS;93;INFOS_93;L'équipe n'accepte désormais que les membres du groupe du personnage principal.;;1;objects/Fight.java:2209
+Im094;094;INFOS;94;INFOS_94;L'équipe accepte les membres de tous les groupes.;;1;objects/Fight.java:2209
+Im095;095;INFOS;95;INFOS_95;L'équipe n'accepte plus de personnages supplémentaires.;;3;objects/Fight.java:2192 | objects/Fight.java:2198 | objects/Fight.java:2215
+Im096;096;INFOS;96;INFOS_96;L'équipe accepte de nouveau des personnages supplémentaires.;;3;objects/Fight.java:2192 | objects/Fight.java:2198 | objects/Fight.java:2215
+Im0103;0103;INFOS;103;INFOS_103;Demande d'aide signalée...;;2;objects/Fight.java:2250 | objects/Fight.java:2256
+Im0104;0104;INFOS;104;INFOS_104;Demande d'aide annulée...;;2;objects/Fight.java:2250 | objects/Fight.java:2256
+Im0115;0115;INFOS;115;INFOS_115;Ce canal est restreint pour améliorer sa lisibilité. Vous pourrez envoyer un nouveau message dans %1 secondes. Ceci ne vous autorise cependant pas pour autant à surcharger ce canal.;1;4;game/GameThread.java:3658 | game/GameThread.java:3679 | game/GameThread.java:3693 | game/GameThread.java:3720
+Im0118;0118;INFOS;118;INFOS_118;Vous n'arrivez pas à assembler correctement les ingrédients, et vous n'arrivez pas à concevoir quoi que ce soit d'utilisable cette fois.;;1;objects/Metier.java:473
+Im0152;0152;INFOS;152;INFOS_152;Précédente connexion sur votre compte effectuée le %3/%2/%1 à %4:%5 via l'adresse IP %6;1,2,3,4,5,6;1;objects/Personnage.java:878
+Im0153;0153;INFOS;153;INFOS_153;Votre adresse IP actuelle est %1.;1;1;objects/Personnage.java:879
+Im0183;0183;INFOS;183;INFOS_183;Malgré vos talents, la magie n'opère pas et vous sentez l'échec de la transformation.;;1;objects/Metier.java:1236
+Im0188;0188;INFOS;188;INFOS_188;Et comme d'habitude, c'est à <b>%1</b> que l'on doit cet exploit...;1;1;objects/Challenge.java:74
+Im12;12;ERROR;2;ERROR_2;Tu n'exerces pas le métier nécessaire;;1;objects/Action.java:255
+Im14;14;ERROR;4;ERROR_4;Tu ne possèdes pas l'objet nécessaire;;2;common/Constants.java:2944 | game/GameThread.java:1041
+Im19;19;ERROR;9;ERROR_9;Tu connais déjà suffisamment de métiers.;;2;objects/Action.java:211 | objects/Action.java:246
+Im111;111;ERROR;11;ERROR_11;Tu as déjà appris ce métier.;;2;objects/Action.java:206 | objects/Action.java:241
+Im112;112;ERROR;12;ERROR_12;Tu es trop chargé. Jette quelques objets pour pouvoir bouger...;;1;game/GameThread.java:4313
+Im113;113;ERROR;13;ERROR_13;Cette action n'est pas autorisée sur cette carte.;;1;game/GameThread.java:611
+Im114;114;ERROR;14;ERROR_14;Le joueur %1 était absent et n'a donc pas reçu votre message.;1;1;game/GameThread.java:3752
+Im115;115;ERROR;15;ERROR_15;Pour des raisons de maintenances, le serveur va être redémarré dans %1.;1;3;common/Commands.java:52 | common/Commands.java:55 | common/Commands.java:1696
+Im119;119;ERROR;19;ERROR_19;Tes caractéristiques ne conviennent pas;;1;objects/Action.java:41
+Im123;123;ERROR;23;ERROR_23;Impossible de devenir marchand : tu n'as aucun objet à vendre...;;2;game/GameThread.java:2140 | game/GameThread.java:2171
+Im125;125;ERROR;25;ERROR_25;Impossible : il ne peut y avoir plus de %1 vendeurs sur cette carte.;1;2;game/GameThread.java:2135 | game/GameThread.java:2166
+Im132;132;ERROR;32;ERROR_32;Tu ne peux pas avoir plus de %1 maison(s).;1;1;objects/House.java:293
+Im139;139;ERROR;39;ERROR_39;Ton épouse n'est pas disponible pour l'instant...;;1;game/GameThread.java:1286
+Im140;140;ERROR;40;ERROR_40;Ton époux n'est pas disponible pour l'instant...;;1;game/GameThread.java:1285
+Im141;141;ERROR;41;ERROR_41;Il n'y a pas de place disponible près de ton épouse.;;1;objects/Personnage.java:3814
+Im142;142;ERROR;42;ERROR_42;Il n'y a pas de place disponible près de ton époux.;;1;objects/Personnage.java:3817
+Im153;153;ERROR;53;ERROR_53;Votre familier prend la ressource, la renifle un peu, ne semble pas convaincu et vous la rend.;;1;game/GameThread.java:1769
+Im154;154;ERROR;54;ERROR_54;Vous n'avez pas assez fait attention à votre familier. Il s'est transformé en fantôme !;;3;objects/PetsEntry.java:157 | objects/PetsEntry.java:241 | objects/PetsEntry.java:353
+Im155;155;ERROR;55;ERROR_55;Le niveau de ta guilde ne te permet pas d'avoir plus de %1 membres.;1;1;game/GameThread.java:898
+Im157;157;ERROR;57;ERROR_57;Impossible de rejoindre ce combat en mode 'Spectateur'.;;1;objects/Fight.java:4287
+Im172;172;ERROR;72;ERROR_72;Cet objet n'est plus disponible à ce prix. Quelqu'un a été plus rapide...;;1;game/GameThread.java:2279
+Im176;176;ERROR;76;ERROR_76;Vous n'avez pas assez de kamas pour acquitter la taxe de mise en mode marchand...;;2;game/GameThread.java:2161 | game/GameThread.java:2637
+Im178;178;ERROR;78;ERROR_78;Votre état et celui de votre mari ne vous permet pas de le rejoindre actuellement.;;1;objects/Personnage.java:3801
+Im179;179;ERROR;79;ERROR_79;Votre état et celui de votre femme ne vous permet pas de la rejoindre actuellement.;;1;objects/Personnage.java:3804
+Im182;182;ERROR;82;ERROR_82;Vous n'avez pas assez de kamas pour effectuer cette action.;;2;game/GameThread.java:601 | game/GameThread.java:1121
+Im183;183;ERROR;83;ERROR_83;Votre déshonneur ne vous permet pas de faire cette action.;;7;objects/Personnage.java:3124 | objects/Personnage.java:3636 | objects/Action.java:62 | game/GameThread.java:419 | game/GameThread.java:3173 | game/GameThread.java:3205 | game/GameThread.java:3713
+Im189;189;ERROR;89;ERROR_89;Bienvenue sur DOFUS Retro, dans le Monde des Douze !\nRappel : prenez garde, il est interdit de transmettre votre identifiant de connexion ainsi que votre mot de passe.;;1;objects/Personnage.java:876
+Im191;191;ERROR;91;ERROR_91;Action impossible en cours de combat.;;1;game/GameThread.java:4242
+Im194;194;ERROR;94;ERROR_94;Impossible de vendre un enclos public.;;2;objects/Carte.java:1119 | game/GameThread.java:1178
+Im195;195;ERROR;95;ERROR_95;Impossible de vendre un enclos qui ne vous appartient pas.;;2;objects/Carte.java:1124 | game/GameThread.java:1183
+Im196;196;ERROR;96;ERROR_96;Impossible d'acheter un enclos public.;;2;objects/Carte.java:1094 | game/GameThread.java:1094
+Im197;197;ERROR;97;ERROR_97;Impossible d'acheter un enclos non en vente.;;2;objects/Carte.java:1099 | game/GameThread.java:1099
+Im198;198;ERROR;98;ERROR_98;Seul le meneur de la guilde peut acheter des enclos.;;2;objects/Carte.java:1109 | game/GameThread.java:1109
+Im1101;1101;ERROR;101;ERROR_101;Vous ne disposez pas des droits de guildes suffisants pour cette opération.;;3;objects/Personnage.java:3143 | game/GameThread.java:2381 | game/GameThread.java:2421
+Im1102;1102;ERROR;102;ERROR_102;Cellule cible invalide.;;1;objects/Action.java:661
+Im1103;1103;ERROR;103;ERROR_103;Impossible d'acheter un enclos supplémentaire. Une guilde peut acquérir un enclos après son niveau 10, puis un supplémentaire par tranche de 10 niveaux. Il faut en outre que la guilde soit agée de plus de 2 mois.;;1;game/GameThread.java:1116
+Im1124;1124;ERROR;124;ERROR_124;A force de trop parler, vous en avez perdu la voix. Vous devriez vous taire pendant les %1 prochaines secondes.;1;2;common/Commands.java:619 | game/GameThread.java:3572
+Im1127;1127;ERROR;127;ERROR_127;Incarnam ne vous est plus accessible désormais, votre expérience fait de vous un aventurier apte à parcourir le monde sans continuer dans cette zone...;;1;objects/Carte.java:1132
+Im1135;1135;ERROR;135;ERROR_135;Vous devez appartenir à une guilde pour profiter de cette possibilité.;;6;objects/Carte.java:1104 | game/GameThread.java:641 | game/GameThread.java:650 | game/GameThread.java:669 | game/GameThread.java:679 | game/GameThread.java:1104
+Im1136;1136;ERROR;136;ERROR_136;La téléportation vers cette maison de guilde n'a pas été autorisée par son propriétaire.;;1;game/GameThread.java:684
+Im1137;1137;ERROR;137;ERROR_137;Vous êtes à court de potion de foyer de guilde.;;1;game/GameThread.java:693
+Im1145;1145;ERROR;145;ERROR_145;Il n'y a pas assez de place ici.;;2;game/GameThread.java:1654 | game/GameThread.java:2342
+Im1159;1159;ERROR;159;ERROR_159;Vous êtes à court de potion d'enclos de guilde.;;1;game/GameThread.java:660
+Im1164;1164;ERROR;164;ERROR_164;Une sauvegarde du serveur est en cours... Vous pouvez continuer de jouer, mais l'accès au serveur est temporairement bloqué. La connexion sera de nouveau possible d'ici quelques instants. Merci de votre patience.;;1;game/GameServer.java:99
+Im1165;1165;ERROR;165;ERROR_165;La sauvegarde du serveur est terminée. L'accès au serveur est de nouveau possible. Merci de votre compréhension.;;1;game/GameServer.java:101
+Im1168;1168;ERROR;168;ERROR_168;Vous ne pouvez pas poser plus de %1 percepteur(s) par zone.;1;1;game/GameThread.java:606
+Im1169;1169;ERROR;169;ERROR_169;Impossible de lancer ce sort : vous ne le possédez pas !;;1;objects/Fight.java:2603
+Im1170;1170;ERROR;170;ERROR_170;Impossible de lancer ce sort : Vous avez %1 PA disponible(s) et il vous en faut %2 pour ce sort !;1,2;2;objects/Fight.java:2624 | objects/Fight.java:3636
+Im1171;1171;ERROR;171;ERROR_171;Impossible de lancer ce sort : Vous avez une portée de %1 à %2 et vous visez à %3 !;1,2,3;2;objects/Fight.java:2671 | objects/Fight.java:3645
+Im1172;1172;ERROR;172;ERROR_172;Impossible de lancer ce sort : la cellule visée n'est pas disponible !;;1;objects/Fight.java:2634
+Im1173;1173;ERROR;173;ERROR_173;Impossible de lancer ce sort autrement qu'en ligne droite !;;1;objects/Fight.java:2644
+Im1174;1174;ERROR;174;ERROR_174;Impossible de lancer ce sort : un obstacle gène votre vue !;;1;objects/Fight.java:2654
+Im1175;1175;ERROR;175;ERROR_175;Impossible de lancer ce sort actuellement.;;1;objects/Fight.java:2614
+Im1180;1180;ERROR;180;ERROR_180;Ce percepteur est en train d'être récolté, vous ne pouvez pas l'attaquer.;;1;game/GameThread.java:4119

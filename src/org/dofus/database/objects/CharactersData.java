@@ -133,7 +133,7 @@ public class CharactersData {
 			stmt.setShort(10, character.getSize());
 			stmt.setInt(11,   character.getCurrentMap().getId());
 			stmt.setShort(12, character.getCurrentCell());
-			stmt.setInt(13,   character.getBreed().getLife());
+			stmt.setInt(13,   character.getLifeMax());
 			stmt.execute();
 			stmt.close();
 		} finally {

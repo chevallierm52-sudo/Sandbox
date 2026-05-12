@@ -11,8 +11,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.mina.core.session.IoSession;
 import org.dofus.database.objects.CharactersData;
+import org.dofus.database.objects.ItemsData;
 import org.dofus.objects.WorldData;
 import org.dofus.objects.actors.Characters;
+import org.dofus.objects.items.Inventory;
+import org.dofus.objects.items.Item;
+import org.dofus.objects.items.ItemTemplate;
+import org.dofus.objects.items.PetService;
 import org.dofus.objects.maps.MapTemplate;
 import org.dofus.objects.monsters.MonsterGroup;
 import org.dofus.objects.monsters.MonsterTemplate;
@@ -365,8 +370,15 @@ public class Fight {
                 // Drops (tous au premier survivant — TODO : sac de combat)
                 if(!drops.isEmpty() && f == winners.get(0) && sess != null && sess.isConnected()) {
                     for(DropTable.DropResult drop : drops) {
-                        sess.write("OA" + drop.templateId + "|" + drop.quantity + "|0");
+                        ItemTemplate tpl = ItemsData.getTemplate(drop.templateId);
+                        if(tpl == null) continue;
+                        Item stacked = findStackable(chr.getInventory(), tpl);
+                        Item item = chr.getInventory().addItem(tpl, drop.quantity);
+                        if(stacked != null && stacked.getUid() == item.getUid()) ItemsData.update(item);
+                        else ItemsData.insert(chr.getId(), item);
+                        sess.write(Inventory.buildOAPacket(item));
                     }
+                    sess.write("Ow" + chr.getInventory().getUsedPods() + "|" + chr.getMaxPods());
                 }
                 // Réinitialise la regen
                 if(sess != null && sess.isConnected()) {
@@ -375,6 +387,14 @@ public class Fight {
                 // Sauvegarde
                 CharactersData.update(chr);
             }
+        }
+
+        for(Fighter f : fighters.values()) {
+            if(!f.isDead() || f.getType() != Fighter.FighterType.PLAYER) continue;
+            Characters chr = WorldData.getCharacterById(f.getId());
+            if(chr == null) continue;
+            IoSession sess = WorldData.getSessionByAccount().get(chr.getOwner());
+            PetService.onOwnerDeath(chr, sess);
         }
 
         // ── Respawn des survivants sur la carte ───────────────────────────────
@@ -412,6 +432,14 @@ public class Fight {
             IoSession session = WorldData.getSessionByAccount().get(chr.getOwner());
             if(session != null && session.isConnected()) session.write(packet);
         }
+    }
+
+    private static Item findStackable(Inventory inventory, ItemTemplate template) {
+        if(template.getTypeId() < 48) return null;
+        for(Item item : inventory.getBag()) {
+            if(item.getTemplate().getId() == template.getId()) return item;
+        }
+        return null;
     }
 
     // ── Utilitaires privés ────────────────────────────────────────────────────
