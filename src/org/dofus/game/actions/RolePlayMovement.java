@@ -32,12 +32,8 @@ public class RolePlayMovement implements IGameAction {
 	}
 	
 	public static void teleport(GameClient client, MapTemplate nextMap, short cellId) {
-        if(client == null || client.getCharacter() == null || nextMap == null)
+        if(nextMap == null)
         	return;
-
-        // Un changement de carte annule forcément l'action de déplacement courante.
-        // Sinon le client peut rester bloqué en état BUSY si un BaM intervient avant le GKK.
-        client.getActions().clear();
 
         String removePacket = "GM|-" + client.getCharacter().getId();
         for(Characters actor : client.getCharacter().getCurrentMap().getActors().values()) {
@@ -62,7 +58,7 @@ public class RolePlayMovement implements IGameAction {
     			);
         
     }
-
+	
 	@Override
 	public GameActionType getActionType() {
 		return GameActionType.MOVEMENT;
@@ -71,7 +67,7 @@ public class RolePlayMovement implements IGameAction {
 	@Override
 	public void begin() {
 		if(!isValid()) {
-            sendMovementCancel();
+			client.getSession().write("BN");
 			return;
 		}
         if(!hasMovement()) {
@@ -96,7 +92,7 @@ public class RolePlayMovement implements IGameAction {
             EOrientation orientation = Cell.decode(effectivePath.charAt(effectivePath.length() - 3));
 
             if(!isValidDestination(cellId)) {
-                sendMovementCancel();
+                client.getSession().write("BN");
                 return;
             }
 
@@ -170,6 +166,9 @@ public class RolePlayMovement implements IGameAction {
         prepared = true;
         valid = false;
         effectivePath = "";
+        blockedTargetCell = -1;
+        destinationCell = client != null && client.getCharacter() != null
+                ? client.getCharacter().getCurrentCell() : -1;
 
         if(path == null || path.length() < 3 || (path.length() % 3) != 0
                 || client == null || client.getCharacter() == null)
@@ -178,47 +177,149 @@ public class RolePlayMovement implements IGameAction {
         MapTemplate map = client.getCharacter().getCurrentMap();
         if(map == null) return;
 
-        short lastValidCell = client.getCharacter().getCurrentCell();
+        short currentCell = client.getCharacter().getCurrentCell();
+        short lastValidCell = currentCell;
         StringBuilder acceptedPath = new StringBuilder(path.length());
         try {
             for(int i = 0; i + 2 < path.length(); i += 3) {
                 EOrientation orientation = Cell.decode(path.charAt(i));
                 if(orientation == null) return;
-                short cellId = Cell.decode(path.substring(i + 1, i + 3));
-                boolean finalStep = (i + 3 >= path.length());
-                if(cellId == lastValidCell || isValidPathCell(map, cellId, finalStep)) {
-                    acceptedPath.append(path.charAt(i));
-                    acceptedPath.append(path.charAt(i + 1));
-                    acceptedPath.append(path.charAt(i + 2));
-                    map.learnWalkableCell(cellId, "client_path");
-                    lastValidCell = cellId;
+
+                short targetCell = Cell.decode(path.substring(i + 1, i + 3));
+                SegmentResult result = validateSingleSegment(map, lastValidCell, orientation, targetCell);
+
+                if(result.status == SegmentStatus.OK) {
+                    if(targetCell != lastValidCell) {
+                        acceptedPath.append(path.charAt(i));
+                        acceptedPath.append(Cell.encode(targetCell));
+                    }
+                    lastValidCell = targetCell;
                     continue;
                 }
 
-                if(map.isBlockingInteractiveCell(cellId)) {
-                    blockedTargetCell = cellId;
-                    break;
+                if(result.status == SegmentStatus.STOP && result.stopCell != lastValidCell) {
+                    acceptedPath.append(path.charAt(i));
+                    acceptedPath.append(Cell.encode(result.stopCell));
+                    lastValidCell = result.stopCell;
                 }
-
-                return;
+                if(result.blockedCell >= 0) blockedTargetCell = result.blockedCell;
+                break;
             }
         } catch(Exception e) {
             return;
         }
 
-        if(acceptedPath.length() == 0 && blockedTargetCell >= 0) {
-            destinationCell = lastValidCell;
-            valid = true;
-            return;
-        }
-
         effectivePath = acceptedPath.toString();
         destinationCell = lastValidCell;
-        valid = hasMovementPrepared() || blockedTargetCell >= 0;
+        valid = hasMovementPrepared();
     }
 
     private boolean hasMovementPrepared() {
         return effectivePath != null && effectivePath.length() >= 3;
+    }
+
+    private SegmentResult validateSingleSegment(MapTemplate map, short fromCell, EOrientation orientation, short targetCell) {
+        if(targetCell == fromCell) return SegmentResult.ok();
+        if(!isValidCellId(targetCell)) return SegmentResult.no();
+
+        short lastCell = fromCell;
+        short previousCell = fromCell;
+        for(int step = 0; step < 64; step++) {
+            short nextCell = getCellIdFromDirection(lastCell, orientation, map);
+            if(!isValidCellId(nextCell) || nextCell == lastCell) return SegmentResult.no();
+
+            boolean reachedTarget = nextCell == targetCell;
+            if(reachedTarget) {
+                if(isValidDestination(targetCell)) return SegmentResult.ok();
+                return SegmentResult.stop(previousCell, targetCell);
+            }
+
+            if(!isValidTraversalCell(map, nextCell, targetCell)) {
+                return SegmentResult.stop(previousCell, nextCell);
+            }
+
+            previousCell = nextCell;
+            lastCell = nextCell;
+        }
+        return SegmentResult.no();
+    }
+
+    private boolean isValidTraversalCell(MapTemplate map, short cellId, short targetCell) {
+        if(!isValidCellId(cellId)) return false;
+        if(cellId == client.getCharacter().getCurrentCell()) return true;
+        if(map.isBlockingInteractiveCell(cellId)) return false;
+        MapTemplate.Cell cell = map.getCell(cellId);
+        if(map.hasDecodedCells() && (cell == null || !cell.isWalkable())) return false;
+        if(cellId == targetCell) return !map.isCellOccupied(cellId);
+        return true;
+    }
+
+    private short getCellIdFromDirection(short cellId, EOrientation orientation, MapTemplate map) {
+        int width = map != null && map.getWidth() > 0 ? map.getWidth() : 14;
+        int next;
+        switch(orientation) {
+        case EAST:
+            next = cellId + 1;
+            break;
+        case SOUTH_EAST:
+            next = cellId + width;
+            break;
+        case SOUTH:
+            next = cellId + (width * 2 - 1);
+            break;
+        case SOUTH_WEST:
+            next = cellId + (width - 1);
+            break;
+        case WEST:
+            next = cellId - 1;
+            break;
+        case NORTH_WEST:
+            next = cellId - width;
+            break;
+        case NORTH:
+            next = cellId - (width * 2 - 1);
+            break;
+        case NORTH_EAST:
+            next = cellId - width + 1;
+            break;
+        default:
+            return -1;
+        }
+        return (short) next;
+    }
+
+    private boolean isValidCellId(short cellId) {
+        return cellId >= 0 && cellId <= 559;
+    }
+
+    private static final class SegmentResult {
+        private final SegmentStatus status;
+        private final short stopCell;
+        private final short blockedCell;
+
+        private SegmentResult(SegmentStatus status, short stopCell, short blockedCell) {
+            this.status = status;
+            this.stopCell = stopCell;
+            this.blockedCell = blockedCell;
+        }
+
+        static SegmentResult ok() {
+            return new SegmentResult(SegmentStatus.OK, (short) -1, (short) -1);
+        }
+
+        static SegmentResult stop(short stopCell, short blockedCell) {
+            return new SegmentResult(SegmentStatus.STOP, stopCell, blockedCell);
+        }
+
+        static SegmentResult no() {
+            return new SegmentResult(SegmentStatus.NO, (short) -1, (short) -1);
+        }
+    }
+
+    private static enum SegmentStatus {
+        OK,
+        STOP,
+        NO
     }
 
     private boolean runPendingMapAction() {
@@ -242,36 +343,10 @@ public class RolePlayMovement implements IGameAction {
         return true;
     }
 
-    private void sendMovementCancel() {
-        if(client != null && client.getSession() != null) {
-            // Ancestra/Starloco style : GA;0 libère l'état d'action du client Flash.
-            // BN seul peut laisser le client attendre une fin d'action et donc bloquer les clics suivants.
-            client.getSession().write("GA;0");
-        }
-    }
-
-    private boolean isValidPathCell(MapTemplate map, short cellId, boolean finalStep) {
-        if(map == null || !map.isValidCellId(cellId)) return false;
-        if(map.isBlockingInteractiveCell(cellId)) return false;
-
-        if(!map.hasDecodedCells()) {
-            // Sans les 560 cellules serveur, le client officiel reste la meilleure source :
-            // s'il envoie la cellule dans son path, elle est marchable côté client.
-            // On ne bloque que la destination finale occupée.
-            return !finalStep || !map.isCellOccupied(cellId);
-        }
-
-        if(!finalStep) {
-            MapTemplate.Cell cell = map.getCell(cellId);
-            return cell != null && cell.isWalkable();
-        }
-        return map.isValidActorCell(cellId, true);
-    }
-
     private boolean isValidDestination(short cellId) {
         MapTemplate map = client.getCharacter().getCurrentMap();
         if(map == null) return false;
         if(cellId == client.getCharacter().getCurrentCell()) return true;
-        return isValidPathCell(map, cellId, true);
+        return map.isValidActorCell(cellId, true);
     }
 }
