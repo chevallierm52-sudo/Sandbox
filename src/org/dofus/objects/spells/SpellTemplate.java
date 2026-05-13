@@ -104,7 +104,7 @@ public class SpellTemplate {
      * effectId  : type d'effet (95 = dégâts feu, 91 = soin, 111 = +vitalité temporaire...)
      * zone      : lettre de zone (P=point, C=croix, X=croix diagonale, O=cercle...)
      * zoneSize  : taille de la zone
-     * element   : 0=neutre, 1=terre, 2=feu, 3=eau, 4=air
+     * diceStr   : official dice string, for example "1d5+1"
      */
     public static class SpellEffect {
         private final int    effectId;
@@ -113,17 +113,22 @@ public class SpellTemplate {
         private final int    special; // paramètre additionnel (durée buff, etc.)
         private final String zone;
         private final int    zoneSize;
-        private final int    element;
+        private final String diceStr;
 
         public SpellEffect(int effectId, int diceMin, int diceMax, int special,
-                           String zone, int zoneSize, int element) {
+                           String zone, int zoneSize, String diceStr) {
             this.effectId = effectId;
             this.diceMin  = diceMin;
             this.diceMax  = diceMax;
             this.special  = special;
             this.zone     = zone;
             this.zoneSize = zoneSize;
-            this.element  = element;
+            this.diceStr  = diceStr == null || diceStr.length() == 0 ? buildDiceStr(diceMin, diceMax) : diceStr;
+        }
+
+        private static String buildDiceStr(int min, int max) {
+            if(max <= min) return "0d0+" + min;
+            return "1d" + (max - min + 1) + "+" + (min - 1);
         }
 
         public int    getEffectId() { return effectId; }
@@ -132,7 +137,7 @@ public class SpellTemplate {
         public int    getSpecial()  { return special;  }
         public String getZone()     { return zone;     }
         public int    getZoneSize() { return zoneSize; }
-        public int    getElement()  { return element;  }
+        public String getDiceStr()  { return diceStr;  }
 
         /** Valeur rollée de l'effet (entre diceMin et diceMax). */
         public int roll() {

@@ -12,10 +12,10 @@ import java.util.concurrent.TimeUnit;
  * Si le joueur ne joue pas dans ce délai, le tour passe automatiquement.
  *
  * Séquence d'un tour :
- *   1. {@link Fight} appelle {@code startTurn(fighter)} → paquet {@code fTH}
+ *   1. {@link Fight} appelle {@code startTurn(fighter)} -> paquet {@code GTS}
  *   2. Le joueur envoie des actions {@code GA} (mouvement, sort, passer)
  *   3. Le joueur envoie {@code GKK} (fin de tour) OU le timer expire
- *   4. {@link Fight} appelle {@code endTurn()} → paquet {@code fTN}
+ *   4. {@link Fight} appelle {@code endTurn()} -> paquet {@code GTF}
  */
 public class FightTurn {
 
@@ -42,7 +42,7 @@ public class FightTurn {
 
     /**
      * Démarre le tour du combattant donné.
-     * Envoie {@code fTH{id}} + {@code GA0;0;{id}} à tous les combattants.
+     * Envoie {@code GTS{id|durationMs}} a tous les observateurs.
      */
     public void startTurn(Fighter fighter) {
         this.currentFighter = fighter;
@@ -50,9 +50,8 @@ public class FightTurn {
         fighter.resetTurn();
         fighter.setTurnPassed(false);
 
-        // Diffuse le début de tour
-        fight.broadcast("fTH" + fighter.getId());
-        fight.broadcast("GA0;0;" + fighter.getId()); // animation début tour
+        // Format officiel 1.29 : id|dureeMs.
+        fight.broadcast("GTS" + fighter.getId() + "|" + (TURN_DURATION_SEC * 1000));
 
         // Timer de timeout
         cancelTimeout();
@@ -61,13 +60,13 @@ public class FightTurn {
 
     /**
      * Termine le tour courant (demandé par le joueur ou le timer).
-     * Envoie {@code fTN} et demande au Fight de passer au suivant.
+     * Envoie {@code GTF{id}} et demande au Fight de passer au suivant.
      */
     public void endTurn() {
         cancelTimeout();
         if(currentFighter != null) {
             currentFighter.setTurnPassed(true);
-            fight.broadcast("fTN");
+            fight.broadcast("GTF" + currentFighter.getId());
         }
         fight.nextTurn();
     }
@@ -91,6 +90,10 @@ public class FightTurn {
     public Fighter         getCurrentFighter() { return currentFighter; }
     public int             getTurnNumber()     { return turnNumber;     }
     public ScheduledFuture<?> getTurnTimer()   { return timeoutTask;    }
+
+    public static ScheduledFuture<?> schedule(Runnable task, long delay, TimeUnit unit) {
+        return TIMER.schedule(task, delay, unit);
+    }
 
     /** Arrêt propre du timer (fin du serveur). */
     public static void shutdown() {

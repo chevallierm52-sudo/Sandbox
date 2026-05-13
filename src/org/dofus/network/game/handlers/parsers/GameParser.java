@@ -64,6 +64,9 @@ public class GameParser {
         case FIGHT_AGGRESSION:
             handleFightAggression(session, client, packet.substring(5));
             break;
+        case JOIN_FIGHT:
+            handleJoinFight(session, client, packet.substring(5));
+            break;
 		default:
 			logger.warn("Unknown actionType for parseGamePacket: {}", packet);
 			break;
@@ -115,6 +118,18 @@ public class GameParser {
         }
     }
 
+    private static void handleJoinFight(IoSession session, GameClient client, String args) {
+        if(args == null || args.isEmpty() || client == null || client.getCharacter() == null) {
+            session.write("BN");
+            return;
+        }
+        try {
+            FightParser.joinFightAsSpectator(client.getCharacter(), session, Integer.parseInt(args.split(";")[0]));
+        } catch(NumberFormatException e) {
+            session.write("BN");
+        }
+    }
+
     public static void attackMonsterGroup(IoSession session, GameClient client, int groupId) {
         if(client == null || client.getCharacter() == null) {
             if(session != null) session.write("BN");
@@ -141,7 +156,7 @@ public class GameParser {
     			+ character.getCurrentMap().getKey() + "|");
     	// fC0 envoyé ici (phase GC) ET dans information() après GDK (phase GI),
     	// comme AncestraRemake et Shivas le font (deux envois, comportement attendu).
-    	session.write("fC0");
+    	session.write("fC" + FightParser.countFightsOnMap(character.getCurrentMap()));
 	}
 
 	//FIXME BOT MOUVEMENT : c'es
@@ -206,7 +221,7 @@ public class GameParser {
 	    }
 	 
 	    session.write("GDK");
-	    session.write("fC" + 0);
+	    session.write("fC" + FightParser.countFightsOnMap(map));
 	}
 
 	public static void endAction(GameClient client, boolean success, String args) throws Exception {

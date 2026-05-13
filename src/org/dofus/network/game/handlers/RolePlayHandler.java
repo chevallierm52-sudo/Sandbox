@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.apache.mina.core.session.IoSession;
 import org.dofus.database.objects.CharactersData;
+import org.dofus.database.objects.SpellsData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.dofus.network.game.Game;
@@ -28,6 +29,7 @@ import org.dofus.network.game.handlers.parsers.InventoryParser;
 import org.dofus.network.game.handlers.parsers.PartyParser;
 import org.dofus.objects.items.Inventory;
 import org.dofus.network.game.handlers.parsers.QuestParser;
+import org.dofus.network.game.handlers.parsers.SpellParser;
 import org.dofus.network.game.handlers.parsers.WaypointParser;
 import org.dofus.objects.WorldData;
 import org.dofus.objects.actors.Characters;
@@ -51,7 +53,8 @@ public class RolePlayHandler extends GameClientHandler {
 		
 		session.write("al|"); //TODO Area align status
 		//Spell
-		session.write("SL"); //Spell list message
+		SpellsData.loadCharacterSpells(character);
+		session.write(SpellsData.buildSLPacket(character.getSpellBook())); //Spell list message
 		session.write("AR" + character.getRestriction().toBase36());
 		Inventory inv = character.getInventory();
 		session.write("Ow" + inv.getUsedPods() + "|" + character.getMaxPods());
@@ -78,6 +81,7 @@ public class RolePlayHandler extends GameClientHandler {
 		session.write("IC|"); //On remet à zéro les drapeaux
 		session.write("BT82800000");//FIXME idk Gestion de la nuit
 		RegenService.refresh(character, session);
+		FightParser.reconnectIfNeeded(character, session);
 	}
 	
 	@Override
@@ -134,10 +138,10 @@ public class RolePlayHandler extends GameClientHandler {
 			break;
 			/*case 'R':
 				parseMountPacket(packet);
-			break;
-			case 'S':
-				parseSpellPacket(packet);
 			break;*/
+			case 'S':
+				SpellParser.parse(character, session, packet);
+			break;
 			case 'W':
 				parseWaypointPacket(packet);
 			break;
@@ -268,17 +272,36 @@ public class RolePlayHandler extends GameClientHandler {
             }
             break;
         case 'C': // GC — création personnage
-        	GameParser.creation(character, session);
+            if(FightParser.getFightForCharacter(character) != null) {
+                FightParser.reconnectIfNeeded(character, session);
+            } else {
+                GameParser.creation(character, session);
+            }
             break;
         case 'I': // GI — informations carte
-        	GameParser.information(character, session, client, character.getCurrentMap());
+            if(FightParser.getFightForCharacter(character) != null) {
+                FightParser.reconnectIfNeeded(character, session);
+            } else {
+                GameParser.information(character, session, client, character.getCurrentMap());
+            }
             break;
         case 'K': // GK — fin d'action
         	if(packet.length() > 2)
         	    GameParser.endAction(client, packet.charAt(2) == 'K', packet.substring(3));
             break;
+        case 'p': // Gp{cell} - choix cellule placement
+            if(FightParser.getFightForCharacter(character) != null && packet.length() > 2) {
+                FightParser.choosePlacementCell(character, session, packet.substring(2));
+            }
+            break;
         case 'R': // GR{groupId} — attaque un groupe de monstres
             if(packet.length() > 2) {
+                if(FightParser.getFightForCharacter(character) != null
+                        && packet.length() == 3
+                        && (packet.charAt(2) == '0' || packet.charAt(2) == '1')) {
+                    FightParser.setReady(character, session, packet.charAt(2) == '1');
+                    break;
+                }
                 try {
                     int groupId = Integer.parseInt(packet.substring(2));
                     GameParser.attackMonsterGroup(session, client, groupId);
@@ -290,11 +313,32 @@ public class RolePlayHandler extends GameClientHandler {
                 FightParser.parseFightPacket(character, session, "fN");
             }
             break;
+        case 't': // Gt - fin de tour officielle
+            if(FightParser.getFightForCharacter(character) != null) {
+                FightParser.passTurn(character, session);
+            }
+            break;
         }
 	}
 
 	@Override
 	public void onClosed() {
+        org.dofus.game.fight.Fight activeFight = FightParser.getFightForCharacter(character);
+        if(activeFight != null && activeFight.getState() != org.dofus.game.fight.Fight.State.FINISHED) {
+            FightParser.markDisconnected(character);
+            DeferredSaveService.cancel(character.getId());
+            CharactersData.update(character);
+            WorldData.removeSessionByAccount(client.getAccount());
+            WorldData.removeController(character.getId());
+            character.setConnected(false);
+            client.getAccount().setConnected(false);
+            ChatFilter.remove(character.getId());
+            BankParser.evictCache(client.getAccount().getId());
+            RegenService.stop(character);
+            logger.debug("RolePlayHandler closed for character {} during fight {}", character.getName(), activeFight.getId());
+            return;
+        }
+
 		//Check si c'est une déconnexion ou un changement de perso
 		character.getCurrentMap().removeActor(character);
 		List<Characters> snapshot = new ArrayList<>(character.getCurrentMap().getActors().values());

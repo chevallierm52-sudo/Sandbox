@@ -8,6 +8,7 @@ import org.dofus.database.objects.ExperiencesData;
 import org.dofus.database.objects.GuildsData;
 import org.dofus.database.objects.ItemsData;
 import org.dofus.database.objects.MapsData;
+import org.dofus.database.objects.SpellsData;
 import org.dofus.game.actions.RolePlayMovement;
 import org.dofus.network.game.GameClient;
 import org.dofus.objects.WorldData;
@@ -292,11 +293,13 @@ public class AdminParser {
 
         short oldLevel = target.getExperience().getLevel();
         applyDebugLevel(target, lvl);
+        SpellsData.loadCharacterSpells(target);
         CharactersData.update(target);
 
         IoSession ts = getSession(target);
         if(ts != null && ts.isConnected()) {
             ts.write("AN" + lvl);
+            ts.write(SpellsData.buildSLPacket(target.getSpellBook()));
             ts.write(Statistic.getStatisticsMessage(target));
             ts.write("Ow" + target.getInventory().getUsedPods() + "|" + target.getMaxPods());
             if(lvl > oldLevel) {

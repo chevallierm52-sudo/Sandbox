@@ -1,6 +1,8 @@
 package org.dofus.objects.actors;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 
 import org.dofus.constants.EConstants;
@@ -17,6 +19,7 @@ import org.dofus.objects.experiences.AlignmentExperience;
 import org.dofus.objects.experiences.CharacterExperience;
 import org.dofus.objects.items.Inventory;
 import org.dofus.objects.maps.MapTemplate;
+import org.dofus.objects.spells.KnownSpell;
 
 public class Characters implements IActor {
 
@@ -55,6 +58,7 @@ public class Characters implements IActor {
 
 	private Spell spells;
 	private short spellPoint;
+	private final LinkedHashMap<Integer, KnownSpell> spellBook = new LinkedHashMap<>();
 
 	// TODO: Faire une classe Alignment -> AlignmentExp pour tout réunir en une
 	// classe
@@ -326,6 +330,18 @@ public class Characters implements IActor {
 
 	public void setSpells(Spell spells) {
 		this.spells = spells;
+	}
+
+	public Map<Integer, KnownSpell> getSpellBook() {
+		return spellBook;
+	}
+
+	public KnownSpell getKnownSpell(int spellId) {
+		return spellBook.get(spellId);
+	}
+
+	public void learnSpell(KnownSpell spell) {
+		if(spell != null) spellBook.put(spell.getSpellId(), spell);
 	}
 
 	public short getSpellPoint() {

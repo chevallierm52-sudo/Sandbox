@@ -40,6 +40,7 @@ public class Fighter {
     private final int intel;
     private final int chance;
     private final int wisdom;
+    private       int initiative;
 
     // Résistances %
     private final int resNeutral;
@@ -51,11 +52,16 @@ public class Fighter {
     // Position
     private short        cell;
     private EOrientation orientation;
+    private int          level = 1;
+    private int          gfxId = 0;
+    private int          templateId = 0;
 
     // État
     private boolean dead         = false;
     private boolean turnPassed   = false;
     private boolean canPlay      = true;
+    private boolean ready        = false;
+    private boolean disconnected = false;
 
     public Fighter(int id, String name, FighterType type, int teamId,
                    short life, int ap, int mp,
@@ -77,6 +83,7 @@ public class Fighter {
         this.intel       = intel;
         this.chance      = chance;
         this.wisdom      = wisdom;
+        this.initiative  = Math.max(1, agility + wisdom / 10);
         this.resNeutral  = resNeutral;
         this.resEarth    = resEarth;
         this.resFire     = resFire;
@@ -103,7 +110,10 @@ public class Fighter {
         int factor = Math.max(0, Math.min(100, resist));
         int damage = Math.max(1, raw - raw * factor / 100);
         currentLife = (short) Math.max(0, currentLife - damage);
-        if(currentLife <= 0) dead = true;
+        if(currentLife <= 0) {
+            dead = true;
+            canPlay = false;
+        }
         return damage;
     }
 
@@ -152,6 +162,8 @@ public class Fighter {
     public int   getIntel()       { return intel;      }
     public int   getChance()      { return chance;     }
     public int   getWisdom()      { return wisdom;     }
+    public int   getInitiative()  { return initiative; }
+    public void  setInitiative(int initiative) { this.initiative = Math.max(1, initiative); }
 
     public int   getResNeutral()  { return resNeutral; }
     public int   getResEarth()    { return resEarth;   }
@@ -163,12 +175,24 @@ public class Fighter {
     public void         setCell(short c) { this.cell = c;      }
     public EOrientation getOrientation() { return orientation; }
     public void         setOrientation(EOrientation o) { this.orientation = o; }
+    public int          getLevel()       { return level;       }
+    public int          getGfxId()       { return gfxId;       }
+    public int          getTemplateId()  { return templateId;  }
+    public void         setVisual(int level, int gfxId) {
+        this.level = Math.max(1, level);
+        this.gfxId = Math.max(0, gfxId);
+    }
+    public void         setTemplateId(int templateId) { this.templateId = templateId; }
 
     public boolean isDead()        { return dead;        }
     public boolean hasTurnPassed() { return turnPassed;  }
     public void    setTurnPassed(boolean b) { turnPassed = b; }
-    public boolean canPlay()       { return canPlay && !dead; }
+    public boolean canPlay()       { return canPlay && !dead && !disconnected; }
     public void    setCanPlay(boolean b) { canPlay = b; }
+    public boolean isReady()       { return ready; }
+    public void    setReady(boolean ready) { this.ready = ready; }
+    public boolean isDisconnected(){ return disconnected; }
+    public void    setDisconnected(boolean disconnected) { this.disconnected = disconnected; }
 
     /** Paquet de présence dans la liste combat (affiché dans l'interface fP). */
     public String toFLEntry() {

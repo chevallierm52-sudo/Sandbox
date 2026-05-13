@@ -2,6 +2,7 @@ package org.dofus.objects.experiences;
 
 import org.apache.mina.core.session.IoSession;
 import org.dofus.constants.EConstants;
+import org.dofus.database.objects.SpellsData;
 import org.dofus.database.objects.ExperiencesData;
 import org.dofus.objects.WorldData;
 import org.dofus.objects.actors.Characters;
@@ -36,7 +37,11 @@ public class CharacterExperience extends AExperience {
 			up = true;
 		}
 
-		if(up) session.write("AN" + level);
+		if(up) {
+			SpellsData.loadCharacterSpells(character);
+			session.write("AN" + level);
+			session.write(SpellsData.buildSLPacket(character.getSpellBook()));
+		}
 		session.write(Statistic.getStatisticsMessage(character));
 	}
 

@@ -1,74 +1,91 @@
 package org.dofus.network.game.handlers.parsers;
 
 import org.apache.mina.core.session.IoSession;
-import org.dofus.game.fight.DropTable;
+import org.dofus.constants.EConstants;
 import org.dofus.game.fight.Fight;
 import org.dofus.game.fight.Fighter;
+import org.dofus.network.game.GameClient;
 import org.dofus.objects.WorldData;
 import org.dofus.objects.actors.Characters;
 import org.dofus.objects.actors.EOrientation;
+import org.dofus.objects.characters.Statistic;
+import org.dofus.objects.maps.MapTemplate;
 import org.dofus.objects.monsters.MonsterGroup;
 import org.dofus.objects.monsters.MonsterTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Parseur des packets de combat Dofus 1.29.
- *
- * Packets reçus du client (préfixe 'f') :
- *   fK          — Quitter le combat (en phase de placement seulement)
- *   fN          — Passer son tour (GKK dans le paquet GA)
- *   fP{cell}    — Choisir sa cellule de placement (phase fP)
- *
- * Packets reçus préfixe 'G' (combat) :
- *   GKK / GKE  — Fin de tour (touche fin de tour)
- *   GA{actionId};{unk};{fighterId};{args} — Action de combat
- *
- * Branchement dans {@link org.dofus.network.game.handlers.RolePlayHandler} :
- *   case 'f' → FightParser.parseFightPacket()
- *   GA dans parseGamePacket → si en combat → FightParser.parseAction()
- *
- * TODO : compléter toutes les actions GA (sorts 300+, objets 100+, etc.)
- */
 public class FightParser {
 
     private static final Logger logger = LoggerFactory.getLogger(FightParser.class);
 
-    // ── Entrée principale ─────────────────────────────────────────────────────
-
-    /**
-     * Traite un packet combat commençant par 'f'.
-     */
     public static void parseFightPacket(Characters character, IoSession session, String packet) {
-        if(packet.length() < 2) return;
+        if(packet == null || packet.length() < 2) return;
 
         switch(packet.charAt(1)) {
-            case 'K': // fK — quitter le combat (placement seulement)
+            case 'K':
                 leaveFight(character, session);
                 break;
-            case 'N': // fN — passer son tour
+            case 'N':
                 passTurn(character, session);
                 break;
-            case 'P': // fP{cell} — choisir cellule placement
+            case 'P':
                 choosePlacementCell(character, session, packet.substring(2));
                 break;
+            case 'L':
+                sendFightsList(character, session);
+                break;
+            case 'D':
+                sendFightDetails(session, packet.substring(2));
+                break;
+            case 'S':
+                session.write("BN");
+                break;
             default:
-                logger.debug("FightParser : packet inconnu : {}", packet);
+                logger.debug("FightParser unknown packet: {}", packet);
         }
     }
 
-    /**
-     * Traite une action GA (mouvement, sort, item...) en combat.
-     * Appelé depuis GameParser.action() si le personnage est en combat.
-     *
-     * Format GA : GA{actionId};{unk};{fighterId};{args}
-     */
     public static void parseAction(Characters character, IoSession session, String packet) {
-        // ex : "GA1;1;123;aPVa..."   (mouvement)
-        //      "GA300;1;123;spellId|targetCell"  (sort)
-        if(packet.length() < 3) return;
+        if(packet == null || packet.length() < 5) return;
 
-        String body = packet.substring(2); // retire "GA"
+        Fight fight = getFightForCharacter(character);
+        if(fight == null) return;
+
+        Fighter fighter = fight.getFighter(character.getId());
+        if(fighter == null) return;
+
+        Integer actionId = parseOfficialActionId(packet);
+        if(actionId != null) {
+            String args = packet.substring(5);
+            if(actionId == 300) {
+                String[] spellArgs = args.split(";", 2);
+                if(spellArgs.length < 2) return;
+                try {
+                    int spellId = Integer.parseInt(spellArgs[0]);
+                    fight.handleAction(fighter, 300 + spellId, spellArgs[1]);
+                } catch(NumberFormatException ignored) {
+                    return;
+                }
+            } else {
+                fight.handleAction(fighter, actionId, args);
+            }
+            return;
+        }
+
+        parseLegacyAction(fight, fighter, packet);
+    }
+
+    private static Integer parseOfficialActionId(String packet) {
+        try {
+            return Integer.valueOf(Integer.parseInt(packet.substring(2, 5)));
+        } catch(NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static void parseLegacyAction(Fight fight, Fighter fighter, String packet) {
+        String body = packet.substring(2);
         String[] parts = body.split(";", 4);
         if(parts.length < 3) return;
 
@@ -76,44 +93,42 @@ public class FightParser {
         try { actionId = Integer.parseInt(parts[0]); }
         catch(NumberFormatException e) { return; }
 
-        // Retrouver le Fight depuis la session du personnage
-        Fight fight = getFightForCharacter(character);
-        if(fight == null) {
-            logger.debug("FightParser.parseAction : {} n'est pas en combat", character.getName());
-            return;
+        String args = parts.length >= 4 ? parts[3] : "";
+        if(actionId == 300) {
+            String[] spellArgs = args.split("[|;]", 2);
+            if(spellArgs.length < 2) return;
+            try {
+                int spellId = Integer.parseInt(spellArgs[0]);
+                fight.handleAction(fighter, 300 + spellId, spellArgs[1]);
+            } catch(NumberFormatException ignored) {
+                return;
+            }
+        } else {
+            fight.handleAction(fighter, actionId, args);
         }
+    }
+
+    public static void setReady(Characters character, IoSession session, boolean ready) {
+        Fight fight = getFightForCharacter(character);
+        if(fight == null || fight.getState() != Fight.State.PLACEMENT) return;
+        Fighter fighter = fight.getFighter(character.getId());
+        if(fighter != null) fight.setReady(fighter, ready);
+    }
+
+    public static void choosePlacementCell(Characters character, IoSession session, String cellStr) {
+        Fight fight = getFightForCharacter(character);
+        if(fight == null || fight.getState() != Fight.State.PLACEMENT) return;
+
+        short cell;
+        try { cell = Short.parseShort(cellStr); }
+        catch(NumberFormatException e) { return; }
 
         Fighter fighter = fight.getFighter(character.getId());
         if(fighter == null) return;
-
-        String args = parts.length >= 4 ? parts[3] : "";
-        fight.handleAction(fighter, actionId, args);
+        if(!fight.choosePlacementCell(fighter, cell)) session.write("GICe");
     }
 
-    // ── Handlers ──────────────────────────────────────────────────────────────
-
-    private static void leaveFight(Characters character, IoSession session) {
-        Fight fight = getFightForCharacter(character);
-        if(fight == null) return;
-        if(fight.getState() != Fight.State.PLACEMENT) {
-            session.write("fKE"); // impossible pendant le combat actif
-            return;
-        }
-
-        // Retire le fighter du combat
-        fight.removeFighter(character.getId());
-        session.write("fKO");
-
-        // Renvoie le personnage sur la carte (paquet GI = game info reload)
-        session.write("GI");
-
-        // Notifie les autres combattants (si d'autres restent)
-        fight.broadcast("fK" + character.getId()); // annonce départ
-
-        logger.debug("{} a quitté le combat {} (placement)", character.getName(), fight.getId());
-    }
-
-    private static void passTurn(Characters character, IoSession session) {
+    public static void passTurn(Characters character, IoSession session) {
         Fight fight = getFightForCharacter(character);
         if(fight == null || fight.getState() != Fight.State.ACTIVE) return;
 
@@ -126,123 +141,209 @@ public class FightParser {
         }
     }
 
-    private static void choosePlacementCell(Characters character, IoSession session, String cellStr) {
+    private static void leaveFight(Characters character, IoSession session) {
         Fight fight = getFightForCharacter(character);
-        if(fight == null || fight.getState() != Fight.State.PLACEMENT) return;
+        if(fight == null) return;
+        if(fight.getState() != Fight.State.PLACEMENT) {
+            session.write("BN");
+            return;
+        }
 
-        short cell;
-        try { cell = Short.parseShort(cellStr); }
-        catch(NumberFormatException e) { return; }
-
-        Fighter fighter = fight.getFighter(character.getId());
-        if(fighter == null) return;
-
-        // TODO : valider que la cellule appartient aux cellules de placement de l'équipe
-        fighter.setCell(cell);
-        fight.broadcast("fPS" + character.getId() + "|" + cell);
-        logger.debug("{} choisit la cellule {} (fight {})", new Object[] { character.getName(), cell, fight.getId()});
+        fight.removeFighter(character.getId());
+        session.write("GV");
+        session.write("GI");
     }
 
-    // ── Initiation d'un combat ────────────────────────────────────────────────
+    public static void initiateFightVsMonsters(Characters character, IoSession session, int targetIdOrCell) {
+        if(character == null || character.getCurrentMap() == null) return;
+        MapTemplate map = character.getCurrentMap();
 
-    /**
-     * Démarre un combat entre un personnage et un groupe de monstres.
-     * Appelé quand le joueur clique sur un groupe sur la carte (packet GR ou similaire).
-     *
-     * @param character  Personnage attaquant
-     * @param session    Session du joueur
-     * @param groupId    ID du groupe de monstres cible
-     */
-    public static void initiateFightVsMonsters(Characters character, IoSession session, int groupId) {
-        if(character.getCurrentMap() == null) return;
-
-        // Retrouver le groupe sur la carte
-        MonsterGroup group = character.getCurrentMap().getMonsterGroups().get(groupId);
+        MonsterGroup group = findMonsterGroupByIdOrCell(map, targetIdOrCell);
         if(group == null) {
-            session.write("fJEa"); // groupe non trouvé
+            session.write("BN");
             return;
         }
 
-        // Vérif : le joueur n'est pas déjà en combat
         if(getFightForCharacter(character) != null) {
-            session.write("fJEb"); // déjà en combat
+            session.write("BN");
             return;
         }
 
-        // Retire le groupe de la carte (il réapparaîtra après le combat)
-        character.getCurrentMap().removeMonsterGroup(group);
-        // Notification de suppression aux joueurs présents
-        for(Characters actor : new java.util.ArrayList<>(character.getCurrentMap().getActors().values())) {
-            IoSession actorSess = WorldData.getSessionByAccount().get(actor.getOwner());
-            if(actorSess != null && actorSess.isConnected())
-                actorSess.write(group.toGMRemove());
-        }
+        map.removeMonsterGroup(group);
+        broadcastOnMap(map, group.toGMRemove(), null);
 
-        // Crée le Fight
-        Fight fight = new Fight(character.getCurrentMap());
+        map.removeActor(character);
+        broadcastOnMap(map, "GM|-" + character.getId(), character);
+        org.dofus.utils.RegenService.stop(character);
+
+        Fight fight = new Fight(map);
         fight.setMonsterGroup(group);
 
-        // Fighter joueur (team 0)
-        Fighter playerFighter = new Fighter(
-            character.getId(), character.getName(),
-            Fighter.FighterType.PLAYER, 0,
-            character.getLife(), 6, 3,
-            character.getStats().getEffect(10), // strength
-            character.getStats().getEffect(14), // agility
-            character.getStats().getEffect(15), // intel
-            character.getStats().getEffect(13), // chance
-            character.getStats().getEffect(12), // wisdom
-            0, 0, 0, 0, 0, // résistances (TODO items)
-            character.getCurrentCell(),
-            character.getCurrentOrientation() != null ? character.getCurrentOrientation() : EOrientation.SOUTH
-        );
+        Fighter playerFighter = buildPlayerFighter(character);
         fight.addFighter(playerFighter);
 
-        // Fighters monstres (team 1)
+        int monsterIndex = 0;
         for(MonsterGroup.MonsterEntry entry : group.getMembers()) {
             MonsterTemplate.MonsterGrade grade = entry.getTemplate().getGrade(entry.getGrade());
             if(grade == null) continue;
-            int monsterId = entry.getTemplate().getId() * 1000 + entry.getGrade(); // ID unique
-            Fighter monsterFighter = new Fighter(
-                monsterId, entry.getTemplate().getName() + " G" + entry.getGrade(),
-                Fighter.FighterType.MONSTER, 1,
-                (short) grade.getLife(), grade.getAp(), grade.getMp(),
-                grade.getStrength(), grade.getAgility(), grade.getIntel(),
-                grade.getChance(), grade.getWisdom(),
-                grade.getNeutral(), grade.getEarth(), grade.getFire(),
-                grade.getWater(), grade.getAir(),
-                group.getCell(),
-                EOrientation.SOUTH
-            );
-            fight.addFighter(monsterFighter);
+            Fighter monster = buildMonsterFighter(group, entry, grade, monsterIndex++);
+            fight.addFighter(monster);
         }
 
-        // Réponse de join au joueur
-        session.write("fJK" + fight.getId()); // join OK
+        fight.ensurePlacementFallbacks(character.getCurrentCell(), group.getCell());
+        placeInitialFighters(fight, character.getCurrentCell(), group.getCell());
+        fight.startPlacement();
 
-        // Paquet de liste des fighters (fL)
-        StringBuilder fL = new StringBuilder("fL");
-        for(Fighter f : fight.getFighters()) {
-            fL.append(f.toFLEntry()).append(';');
-        }
-        session.write(fL.toString());
-
-        // Démarrage du combat (sans phase de placement — directement ACTIVE)
-        fight.startFight();
-
-        logger.info("Fight {} démarré : {} vs groupe {} ({} monstres)",
-        		new Object[] { fight.getId(), character.getName(), groupId, group.getMemberCount()});
+        logger.info("Fight {} placement started: {} vs group {} on map {}",
+                new Object[] { fight.getId(), character.getName(), group.getId(), map.getId() });
     }
 
-    // ── Utilitaire ────────────────────────────────────────────────────────────
+    private static Fighter buildPlayerFighter(Characters character) {
+        short life = (short)Math.max(1, Math.min(character.getLife(), character.getLifeMax()));
+        Fighter fighter = new Fighter(
+                character.getId(),
+                character.getName(),
+                Fighter.FighterType.PLAYER,
+                0,
+                life,
+                Statistic.totalWithEquipment(character, EConstants.ADD_AP.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.ADD_MP.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.ADD_STRENGTH.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.ADD_AGILITY.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.ADD_INTELLIGENCE.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.ADD_CHANCE.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.ADD_WISDOM.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.RESIST_PERCENT_NEUTRAL.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.RESIST_PERCENT_EARTH.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.RESIST_PERCENT_FIRE.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.RESIST_PERCENT_WATER.getInt()),
+                Statistic.totalWithEquipment(character, EConstants.RESIST_PERCENT_AIR.getInt()),
+                character.getCurrentCell(),
+                character.getCurrentOrientation() != null ? character.getCurrentOrientation() : EOrientation.SOUTH);
+        fighter.setInitiative(Statistic.totalWithEquipment(character, EConstants.ADD_INITIATIVE.getInt()) + life);
+        fighter.setVisual(character.getExperience().getLevel(), character.getSkin());
+        return fighter;
+    }
 
-    /**
-     * Retourne le Fight actif du personnage, ou null s'il n'est pas en combat.
-     */
+    private static Fighter buildMonsterFighter(MonsterGroup group, MonsterGroup.MonsterEntry entry,
+            MonsterTemplate.MonsterGrade grade, int index) {
+        int monsterId = 1_000_000 + group.getId() * 10 + index;
+        Fighter fighter = new Fighter(
+                monsterId,
+                entry.getTemplate().getName(),
+                Fighter.FighterType.MONSTER,
+                1,
+                (short)grade.getLife(),
+                grade.getAp(),
+                grade.getMp(),
+                grade.getStrength(),
+                grade.getAgility(),
+                grade.getIntel(),
+                grade.getChance(),
+                grade.getWisdom(),
+                grade.getNeutral(),
+                grade.getEarth(),
+                grade.getFire(),
+                grade.getWater(),
+                grade.getAir(),
+                group.getCell(),
+                EOrientation.SOUTH);
+        fighter.setVisual(grade.getLevel(), entry.getTemplate().getGfxId());
+        fighter.setTemplateId(entry.getTemplate().getId());
+        fighter.setInitiative(grade.getAgility() + grade.getWisdom() / 10 + grade.getLevel());
+        fighter.setReady(true);
+        return fighter;
+    }
+
+    private static void placeInitialFighters(Fight fight, short playerOrigin, short monsterOrigin) {
+        for(Fighter f : fight.getTeam(0)) {
+            f.setCell(fight.pickPlacementCell(f, playerOrigin));
+            f.setReady(false);
+        }
+        for(Fighter f : fight.getTeam(1)) {
+            f.setCell(fight.pickPlacementCell(f, monsterOrigin));
+            f.setReady(true);
+        }
+    }
+
+    private static MonsterGroup findMonsterGroupByIdOrCell(MapTemplate map, int targetIdOrCell) {
+        MonsterGroup group = map.getMonsterGroups().get(targetIdOrCell);
+        if(group != null) return group;
+        for(MonsterGroup candidate : map.getMonsterGroups().values()) {
+            if(candidate != null && candidate.getCell() == targetIdOrCell) return candidate;
+        }
+        return null;
+    }
+
+    public static void joinFightAsSpectator(Characters character, IoSession session, int fightId) {
+        Fight fight = Fight.getFight(fightId);
+        if(fight == null || fight.getState() == Fight.State.FINISHED) {
+            session.write("BN");
+            return;
+        }
+        fight.addSpectator(character, session);
+    }
+
+    public static void sendFightsList(Characters character, IoSession session) {
+        StringBuilder sb = new StringBuilder("fL");
+        if(character == null || character.getCurrentMap() == null) {
+            session.write(sb.toString());
+            return;
+        }
+        for(Fight fight : Fight.getActiveFights().values()) {
+            if(fight.getMap() != character.getCurrentMap()) continue;
+            sb.append('|').append(fight.buildFightListEntry());
+        }
+        session.write(sb.toString());
+    }
+
+    public static int countFightsOnMap(MapTemplate map) {
+        if(map == null) return 0;
+        int count = 0;
+        for(Fight fight : Fight.getActiveFights().values()) {
+            if(fight.getMap() == map && fight.getState() != Fight.State.FINISHED) count++;
+        }
+        return count;
+    }
+
+    private static void sendFightDetails(IoSession session, String idStr) {
+        try {
+            Fight fight = Fight.getFight(Integer.parseInt(idStr));
+            if(fight == null) {
+                session.write("BN");
+                return;
+            }
+            session.write(fight.buildFightDetailsPacket());
+        } catch(NumberFormatException e) {
+            session.write("BN");
+        }
+    }
+
+    public static void markDisconnected(Characters character) {
+        Fight fight = getFightForCharacter(character);
+        if(fight != null) fight.handleDisconnect(character.getId());
+    }
+
+    public static boolean reconnectIfNeeded(Characters character, IoSession session) {
+        Fight fight = getFightForCharacter(character);
+        if(fight == null || fight.getState() == Fight.State.FINISHED) return false;
+        fight.reconnect(character, session);
+        return true;
+    }
+
     public static Fight getFightForCharacter(Characters character) {
+        if(character == null) return null;
         for(Fight f : Fight.getActiveFights().values()) {
             if(f.getFighter(character.getId()) != null) return f;
         }
         return null;
+    }
+
+    private static void broadcastOnMap(MapTemplate map, String packet, Characters except) {
+        for(Characters actor : new java.util.ArrayList<Characters>(map.getActors().values())) {
+            if(actor == null || actor == except) continue;
+            IoSession actorSess = WorldData.getSessionByAccount().get(actor.getOwner());
+            if(actorSess != null && actorSess.isConnected()) actorSess.write(packet);
+        }
     }
 }
