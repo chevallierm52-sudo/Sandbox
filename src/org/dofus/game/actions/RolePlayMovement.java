@@ -35,6 +35,8 @@ public class RolePlayMovement implements IGameAction {
         if(nextMap == null)
         	return;
 
+        client.getActions().clear();
+
         String removePacket = "GM|-" + client.getCharacter().getId();
         for(Characters actor : client.getCharacter().getCurrentMap().getActors().values()) {
             if(actor == client.getCharacter()) continue;
@@ -186,24 +188,27 @@ public class RolePlayMovement implements IGameAction {
                 if(orientation == null) return;
 
                 short targetCell = Cell.decode(path.substring(i + 1, i + 3));
-                SegmentResult result = validateSingleSegment(map, lastValidCell, orientation, targetCell);
+                if(!isValidCellId(targetCell)) return;
 
-                if(result.status == SegmentStatus.OK) {
-                    if(targetCell != lastValidCell) {
+                boolean lastStep = i + 3 >= path.length();
+                boolean blockedCell = map.hasBlockingInteractiveObject(targetCell) || !isWalkablePathCell(map, targetCell);
+                boolean blockedDestination = lastStep && !isValidDestination(targetCell);
+                if(blockedCell || blockedDestination) {
+                    blockedTargetCell = targetCell;
+                    short stopCell = findStopBeforeTarget(map, lastValidCell, orientation, targetCell);
+                    if(stopCell != lastValidCell) {
                         acceptedPath.append(path.charAt(i));
-                        acceptedPath.append(Cell.encode(targetCell));
+                        acceptedPath.append(Cell.encode(stopCell));
+                        lastValidCell = stopCell;
                     }
-                    lastValidCell = targetCell;
-                    continue;
+                    break;
                 }
 
-                if(result.status == SegmentStatus.STOP && result.stopCell != lastValidCell) {
+                if(targetCell != lastValidCell) {
                     acceptedPath.append(path.charAt(i));
-                    acceptedPath.append(Cell.encode(result.stopCell));
-                    lastValidCell = result.stopCell;
+                    acceptedPath.append(Cell.encode(targetCell));
                 }
-                if(result.blockedCell >= 0) blockedTargetCell = result.blockedCell;
-                break;
+                lastValidCell = targetCell;
             }
         } catch(Exception e) {
             return;
@@ -218,108 +223,61 @@ public class RolePlayMovement implements IGameAction {
         return effectivePath != null && effectivePath.length() >= 3;
     }
 
-    private SegmentResult validateSingleSegment(MapTemplate map, short fromCell, EOrientation orientation, short targetCell) {
-        if(targetCell == fromCell) return SegmentResult.ok();
-        if(!isValidCellId(targetCell)) return SegmentResult.no();
-
-        short lastCell = fromCell;
-        short previousCell = fromCell;
-        for(int step = 0; step < 64; step++) {
-            short nextCell = getCellIdFromDirection(lastCell, orientation, map);
-            if(!isValidCellId(nextCell) || nextCell == lastCell) return SegmentResult.no();
-
-            boolean reachedTarget = nextCell == targetCell;
-            if(reachedTarget) {
-                if(isValidDestination(targetCell)) return SegmentResult.ok();
-                return SegmentResult.stop(previousCell, targetCell);
-            }
-
-            if(!isValidTraversalCell(map, nextCell, targetCell)) {
-                return SegmentResult.stop(previousCell, nextCell);
-            }
-
-            previousCell = nextCell;
-            lastCell = nextCell;
-        }
-        return SegmentResult.no();
-    }
-
-    private boolean isValidTraversalCell(MapTemplate map, short cellId, short targetCell) {
-        if(!isValidCellId(cellId)) return false;
+    private boolean isWalkablePathCell(MapTemplate map, short cellId) {
         if(cellId == client.getCharacter().getCurrentCell()) return true;
-        if(map.isBlockingInteractiveCell(cellId)) return false;
         MapTemplate.Cell cell = map.getCell(cellId);
         if(map.hasDecodedCells() && (cell == null || !cell.isWalkable())) return false;
-        if(cellId == targetCell) return !map.isCellOccupied(cellId);
         return true;
     }
 
-    private short getCellIdFromDirection(short cellId, EOrientation orientation, MapTemplate map) {
+    private short findStopBeforeTarget(MapTemplate map, short fallbackCell, EOrientation orientation, short targetCell) {
+        short previousCell = getPreviousCellFromDirection(targetCell, orientation, map);
+        if(previousCell != targetCell && isValidCellId(previousCell)
+                && previousCell != blockedTargetCell && isValidDestination(previousCell)) {
+            return previousCell;
+        }
+
+        Short nearest = map.findNearestValidActorCell(targetCell, true);
+        if(nearest != null && nearest.shortValue() != blockedTargetCell) return nearest.shortValue();
+        return fallbackCell;
+    }
+
+    private short getPreviousCellFromDirection(short cellId, EOrientation orientation, MapTemplate map) {
         int width = map != null && map.getWidth() > 0 ? map.getWidth() : 14;
-        int next;
+        int previous;
         switch(orientation) {
         case EAST:
-            next = cellId + 1;
+            previous = cellId - 1;
             break;
         case SOUTH_EAST:
-            next = cellId + width;
+            previous = cellId - width;
             break;
         case SOUTH:
-            next = cellId + (width * 2 - 1);
+            previous = cellId - (width * 2 - 1);
             break;
         case SOUTH_WEST:
-            next = cellId + (width - 1);
+            previous = cellId - (width - 1);
             break;
         case WEST:
-            next = cellId - 1;
+            previous = cellId + 1;
             break;
         case NORTH_WEST:
-            next = cellId - width;
+            previous = cellId + width;
             break;
         case NORTH:
-            next = cellId - (width * 2 - 1);
+            previous = cellId + (width * 2 - 1);
             break;
         case NORTH_EAST:
-            next = cellId - width + 1;
+            previous = cellId + width - 1;
             break;
         default:
             return -1;
         }
-        return (short) next;
+        return (short) previous;
     }
 
     private boolean isValidCellId(short cellId) {
         return cellId >= 0 && cellId <= 559;
-    }
-
-    private static final class SegmentResult {
-        private final SegmentStatus status;
-        private final short stopCell;
-        private final short blockedCell;
-
-        private SegmentResult(SegmentStatus status, short stopCell, short blockedCell) {
-            this.status = status;
-            this.stopCell = stopCell;
-            this.blockedCell = blockedCell;
-        }
-
-        static SegmentResult ok() {
-            return new SegmentResult(SegmentStatus.OK, (short) -1, (short) -1);
-        }
-
-        static SegmentResult stop(short stopCell, short blockedCell) {
-            return new SegmentResult(SegmentStatus.STOP, stopCell, blockedCell);
-        }
-
-        static SegmentResult no() {
-            return new SegmentResult(SegmentStatus.NO, (short) -1, (short) -1);
-        }
-    }
-
-    private static enum SegmentStatus {
-        OK,
-        STOP,
-        NO
     }
 
     private boolean runPendingMapAction() {

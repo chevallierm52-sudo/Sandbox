@@ -1,0 +1,14 @@
+FILE_BEGIN = true;
+System.security.allowDomain(_parent._url);
+VERSION = 33;
+SUB = new Array();
+SUB[8] = new Array();
+SUB[8][1] = "En este Mundo, existen 6 talismanes\nque encierran poder y prosperidad.";
+SUB[8][2] = "Seis huevos de dragón llamados Dofus,";
+SUB[8][3] = "que fueron robados a sus guardianes...";
+SUB[8][4] = "Entonces, los elementos se desencadenaron,\nLos monstruos se limaron los colmillos,";
+SUB[8][5] = "Los aventureros alzaron sus armas,\n¡Y todo esto acabó en una feliz masacre!";
+SUB[8][6] = "¡Pero el momento ha llegado!\nTu destino te llevará hasta Incarnam.";
+SUB[8][7] = "Conviértete en caballero, en curandero, en invocador...";
+SUB[8][8] = "Encuentra los Dofus,\n¡Y conviértete en el héroe que el Mundo espera!";
+FILE_END = true;

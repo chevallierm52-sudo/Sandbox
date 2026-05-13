@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
  *   .tp <mapId> [cellId]        — téléporte le GM vers une map
  *   .kamas <nom> <montant>      — donne des kamas
  *   .level <nom> <niveau>       — fixe le niveau d'un personnage
+ *   .align <nom> <0|1|2>       — fixe l'alignement (0=neutre, 1=Bonta, 2=Brakmar)
  *   .item <nom> <templateId> [qte] — donne un objet a un personnage
  *   .god                        — bascule l'invulnérabilité du GM
  *   .invis                      — bascule l'invisibilité du GM
@@ -115,6 +116,7 @@ public class AdminParser {
                 case "tp":       cmdTp(actor, session, client, arg1, arg2);break;
                 case "kamas":    cmdKamas(actor, session, arg1, arg2);     break;
                 case "level":    cmdLevel(actor, session, arg1, arg2);     break;
+                case "align":    cmdAlign(actor, session, arg1, arg2);     break;
                 case "item":     cmdItem(actor, session, arg1, arg2);      break;
                 case "getitem":  cmdGetItem(actor, session, arg1, arg2);   break;
                 case "obvixp":   cmdObvijevanXp(actor, session, arg1, arg2); break;
@@ -148,6 +150,9 @@ public class AdminParser {
             if(session != null) session.write("BN");
             return;
         }
+        if(raw.toLowerCase().startsWith("item ")) {
+            raw = "getitem " + raw.substring(5).trim();
+        }
         parse(actor, session, client, raw);
     }
 
@@ -157,7 +162,7 @@ public class AdminParser {
         send(session, "§ ── Commandes GM ──────────────────────────────────");
         send(session, "§ .info .kick <n> .ban <n> .unban <n> .mute <n> .unmute <n>");
         send(session, "§ .goto <n> .bring <n> .tp <mapId> [cellId]");
-        send(session, "§ .kamas <n> <montant> .level <n> <lvl> .item <n> <templateId> [qte]");
+        send(session, "§ .kamas <n> <montant> .level <n> <lvl> .align <n> <0-2> .item <n> <templateId> [qte]");
         send(session, "§ Menu admin : BA!getitem <templateId> [qte] donne l'objet au GM courant");
         send(session, "§ .god .invis .announce <msg> .reload .speed <mult>");
     }
@@ -308,6 +313,30 @@ public class AdminParser {
         send(session, "§ Niveau de " + target.getName() + " fixé à " + lvl + ".");
     }
 
+    private static void cmdAlign(Characters actor, IoSession session, String name, String typeStr) {
+        if(name.isEmpty() || typeStr.isEmpty()) { send(session, "§ Usage : .align <nom> <type>  (0=neutre 1=Bonta 2=Brakmar)"); return; }
+        Characters target = findOnline(session, name);
+        if(target == null) return;
+
+        byte type;
+        try {
+            type = Byte.parseByte(typeStr);
+            if(type < 0 || type > 2) throw new NumberFormatException();
+        } catch(NumberFormatException e) { send(session, "§ Type invalide (0=neutre, 1=Bonta, 2=Brakmar)."); return; }
+
+        target.setAlignmentType(type);
+        CharactersData.update(target);
+
+        IoSession ts = getSession(target);
+        if(ts != null && ts.isConnected()) {
+            ts.write("ZS" + type);
+        }
+
+        String[] labels = {"neutre", "Bonta", "Brakmar"};
+        logger.info("GM {} set alignment {} for {}", new Object[] { actor.getName(), labels[type], target.getName() });
+        send(session, "§ Alignement de " + target.getName() + " fixé à " + labels[type] + ".");
+    }
+
     private static void cmdItem(Characters actor, IoSession session, String name, String args) {
         if(name.isEmpty() || args.isEmpty()) { send(session, "§ Usage : .item <nom> <templateId> [quantite]"); return; }
         Characters target = findOnline(session, name);
@@ -316,7 +345,7 @@ public class AdminParser {
         int[] parsed = parseItemArgs(args);
         if(parsed == null) { send(session, "§ Usage : .item <nom> <templateId> [quantite]"); return; }
 
-        giveItem(actor, session, target, parsed[0], parsed[1], ".item");
+        giveItem(actor, session, target, parsed[0], parsed[1], ".item", false);
     }
 
     private static void cmdGetItem(Characters actor, IoSession session, String templateIdStr, String qtyStr) {
@@ -337,7 +366,7 @@ public class AdminParser {
             return;
         }
 
-        giveItem(actor, session, actor, templateId, quantity, "BA!getitem");
+        giveItem(actor, session, actor, templateId, quantity, "BA!getitem", true);
     }
 
     private static int[] parseItemArgs(String args) {
@@ -410,13 +439,13 @@ public class AdminParser {
     }
 
     private static void giveItem(Characters actor, IoSession adminSession, Characters target,
-                                 int templateId, int quantity, String source) {
+                                 int templateId, int quantity, String source, boolean maxRolls) {
         if(target == null) { send(adminSession, "§ Cible introuvable."); return; }
 
         if(templateId == 113) {
             int[] obvijevans = { 9233, 9234, 9255, 9256 };
             for(int obvijevanId : obvijevans) {
-                giveItem(actor, adminSession, target, obvijevanId, quantity, source + ":type113");
+                giveItem(actor, adminSession, target, obvijevanId, quantity, source + ":type113", maxRolls);
             }
             return;
         }
@@ -429,7 +458,9 @@ public class AdminParser {
 
         IoSession ts = getSession(target);
         for(int i = 0; i < created; i++) {
-            Item item = Item.create(Inventory.nextUid(), template, stackable ? quantity : 1, -1);
+            Item item = maxRolls
+                ? Item.createMax(Inventory.nextUid(), template, stackable ? quantity : 1, -1)
+                : Item.create(Inventory.nextUid(), template, stackable ? quantity : 1, -1);
             Item stored = target.getInventory().addExisting(item);
             if(stored == item) ItemsData.insert(target.getId(), stored);
             else ItemsData.update(stored);
@@ -464,7 +495,7 @@ public class AdminParser {
         }
 
         short maxLife = target.getLifeMax();
-        if(target.getLife() > maxLife || target.getLife() <= 0) target.setLife(maxLife);
+        if(lvl > oldLevel || target.getLife() > maxLife || target.getLife() <= 0) target.setLife(maxLife);
     }
 
     private static void cmdGod(Characters actor, IoSession session) {

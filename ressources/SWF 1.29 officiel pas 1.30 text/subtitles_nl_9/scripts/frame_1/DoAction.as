@@ -1,0 +1,14 @@
+FILE_BEGIN = true;
+System.security.allowDomain(_parent._url);
+VERSION = 9;
+SUB = new Array();
+SUB[8] = new Array();
+SUB[8][1] = "Zes talismans bestaan in deze wereld,\ndragers van mysterieuze krachten en voorspoed.";
+SUB[8][2] = "Zes Dragon eieren, het heilige Dofus,";
+SUB[8][3] = "Zijn gestolen van onze beschermers...";
+SUB[8][4] = "Toen gingen de elementen weer wild tekeer,\nMonsters slepen hun slagtanden,";
+SUB[8][5] = "Avonturiers pakten hun wapen,\nEn alles heeft geleid tot een vrolijke massamoord!";
+SUB[8][6] = "Maar de tijd is gekomen!\nJe lot brengt je naar Incarnam...";
+SUB[8][7] = "Kies je pad als een ridder, een heler of een bezweerder.";
+SUB[8][8] = "Vind de Dofus,\nEn wordt de held waar de wereld op heeft gewacht!";
+FILE_END = true;

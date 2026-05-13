@@ -1,0 +1,14 @@
+FILE_BEGIN = true;
+System.security.allowDomain(_parent._url);
+VERSION = 27;
+SUB = new Array();
+SUB[8] = new Array();
+SUB[8][1] = "Dans ce Monde, il existe 6 talismans\nporteurs de puissance et de prospérité.";
+SUB[8][2] = "Six oeufs de Dragon nommés Dofus";
+SUB[8][3] = "Qui furent dérobés à leurs gardiens...";
+SUB[8][4] = "Alors, les éléments se déchaînèrent,\nLes monstres se brossèrent les crocs,";
+SUB[8][5] = "Les aventuriers brandirent leurs lames,\nEt ce fut un joyeux carnage !";
+SUB[8][6] = "Mais le temps est venu !\nTa destinée te mène à Incarnam...";
+SUB[8][7] = "Deviens chevalier, guérisseur, invocateur,";
+SUB[8][8] = "Retrouve les Dofus,\nEt deviens le héros que le Monde attend !";
+FILE_END = true;

@@ -1,5 +1,7 @@
 package org.dofus.utils;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
@@ -22,7 +24,7 @@ import org.slf4j.LoggerFactory;
  * cote serveur sont principalement : active, lineOfSight, movement, groundLevel,
  * groundSlope et les objets interactifs portes par la couche Object2.
  *
- * Certaines bases stockent directement les 560 blocs encodes, d'autres stockent une
+ * Certaines bases stockent directement les blocs encodes, d'autres stockent une
  * chaine hex chiffree avec la clef/date de map. Ce decodeur tente les formats connus
  * et renvoie une map vide si aucune variante n'est exploitable, afin de ne jamais
  * casser le chargement des maps existantes.
@@ -30,7 +32,8 @@ import org.slf4j.LoggerFactory;
 public final class MapCellDecoder {
 
     private static final Logger logger = LoggerFactory.getLogger(MapCellDecoder.class);
-    private static final int CELL_COUNT = 560;
+    private static final int MAX_CELL_COUNT = 560;
+    private static final int MIN_CELL_COUNT = 100;
     private static final int CELL_SIZE = 10;
 
     private MapCellDecoder() {}
@@ -76,7 +79,13 @@ public final class MapCellDecoder {
         if(looksLikePlainCells(data)) return data;
 
         if(mapKey != null && !mapKey.isEmpty() && looksLikeHex(data)) {
-            String checksum = checksum(mapKey);
+            String officialKey = prepareKey(mapKey);
+            if(officialKey != null && !officialKey.isEmpty()) {
+                String decoded = decypherData(data, officialKey, checksumOffset(officialKey), 0);
+                if(looksLikePlainCells(decoded)) return decoded;
+            }
+
+            String checksum = checksumLegacy(mapKey);
             int checksumOffset = 0;
             try {
                 checksumOffset = Integer.parseInt(checksum, 16) * 2;
@@ -92,9 +101,39 @@ public final class MapCellDecoder {
         return null;
     }
 
+    private static int checksumOffset(String key) {
+        int sum = 0;
+        for(int i = 0; i < key.length(); i++) {
+            sum += key.charAt(i) % 16;
+        }
+        return (sum % 16) * 2;
+    }
+
+    private static String prepareKey(String key) {
+        if(key == null || key.isEmpty()) return "";
+        if(!looksLikeHex(key)) return key;
+
+        StringBuilder prepared = new StringBuilder(key.length() / 2);
+        for(int i = 0; i + 1 < key.length(); i += 2) {
+            try {
+                prepared.append((char) Integer.parseInt(key.substring(i, i + 2), 16));
+            } catch(NumberFormatException e) {
+                return key;
+            }
+        }
+
+        try {
+            return URLDecoder.decode(prepared.toString(), "UTF-8");
+        } catch(UnsupportedEncodingException e) {
+            return prepared.toString();
+        } catch(IllegalArgumentException e) {
+            return prepared.toString();
+        }
+    }
+
     private static Map<Short, Cell> decodePlainCells(String data) {
         Map<Short, Cell> cells = new LinkedHashMap<Short, Cell>();
-        int max = Math.min(CELL_COUNT, data.length() / CELL_SIZE);
+        int max = Math.min(MAX_CELL_COUNT, data.length() / CELL_SIZE);
 
         for(short id = 0; id < max; id++) {
             int offset = id * CELL_SIZE;
@@ -145,8 +184,9 @@ public final class MapCellDecoder {
     }
 
     private static boolean looksLikePlainCells(String data) {
-        if(data == null || data.length() < CELL_COUNT * CELL_SIZE) return false;
-        for(int i = 0; i < CELL_COUNT * CELL_SIZE; i++) {
+        if(data == null || data.length() < MIN_CELL_COUNT * CELL_SIZE || (data.length() % CELL_SIZE) != 0)
+            return false;
+        for(int i = 0; i < data.length(); i++) {
             if(StringUtils.HASH.indexOf(data.charAt(i)) < 0) return false;
         }
         return true;
@@ -180,7 +220,7 @@ public final class MapCellDecoder {
         return out.toString();
     }
 
-    private static String checksum(String s) {
+    private static String checksumLegacy(String s) {
         int sum = 0;
         for(int i = 1; i < s.length(); i++) {
             sum += s.charAt(i) % 16;

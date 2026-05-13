@@ -4,9 +4,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -37,7 +37,11 @@ public class MonstersData {
 
     /** Cache global des templates : id → MonsterTemplate */
     private static final ConcurrentMap<Integer, MonsterTemplate> templates = new ConcurrentHashMap<>();
-    
+
+    private static final int GROUP_SIZE_MIN = 2;
+    private static final int GROUP_SIZE_MAX = 5;
+    private static final Random groupRng = new Random();
+
     // ── Chargement global ─────────────────────────────────────────────────────
 
     public static void load() {
@@ -142,8 +146,7 @@ public class MonstersData {
     }
 
     private static int spawnForMap(Connection conn, MapTemplate map) throws Exception {
-        int count = 0;
-        Map<String, PendingMonsterGroup> pendingGroups = new LinkedHashMap<>();
+        List<RawSpawnEntry> pool = new ArrayList<>();
 
         try(PreparedStatement ps = conn.prepareStatement(
                 "SELECT monster_id, grade, cell_id, orientation, qty " +
@@ -155,50 +158,60 @@ public class MonstersData {
                     if(tpl == null) continue;
 
                     int grade = rs.getInt("grade");
-                    short requestedCell = rs.getShort("cell_id");
+                    short cell = rs.getShort("cell_id");
                     int orientOrd = rs.getInt("orientation");
                     int qty = rs.getInt("qty");
                     if(qty <= 0) qty = 1;
 
                     EOrientation orient = EOrientation.valueOf(orientOrd);
-
-                    /*
-                     * Les lignes SQL monster_spawns représentent souvent les membres d'un
-                     * même groupe quand elles partagent la même cellule/orientation.
-                     * La v4 déplaçait chaque ligne séparément : le premier monstre occupait
-                     * la cellule naturelle, puis les suivants étaient repoussés ailleurs,
-                     * ce qui donnait des groupes à 1 monstre.
-                     * On reconstruit donc le groupe logique AVANT de chercher sa cellule.
-                     */
-                    String groupKey = requestedCell + ":" + orient.ordinal();
-                    PendingMonsterGroup pending = pendingGroups.get(groupKey);
-                    if(pending == null) {
-                        pending = new PendingMonsterGroup(requestedCell, orient);
-                        pendingGroups.put(groupKey, pending);
-                    }
-
                     for(int i = 0; i < qty; i++) {
-                        pending.members.add(new MonsterGroup.Member(tpl, grade));
+                        pool.add(new RawSpawnEntry(tpl, grade, cell, orient));
                     }
                 }
             }
         }
 
-        for(PendingMonsterGroup pending : pendingGroups.values()) {
-            Short naturalCell = map.findNearestValidMonsterCell(pending.requestedCell);
+        if(pool.isEmpty()) return 0;
+
+        /*
+         * Chaque ligne SQL = un monstre individuel avec sa cellule d'ancrage.
+         * On mélange le pool puis on découpe en groupes de GROUP_SIZE_MIN–GROUP_SIZE_MAX
+         * membres (comportement officiel : 2–5 monstres par groupe en moyenne).
+         */
+        Collections.shuffle(pool, groupRng);
+
+        int count = 0;
+        int idx = 0;
+        while(idx < pool.size()) {
+            int remaining = pool.size() - idx;
+            int size = (remaining <= GROUP_SIZE_MIN)
+                    ? remaining
+                    : GROUP_SIZE_MIN + groupRng.nextInt(Math.min(GROUP_SIZE_MAX, remaining) - GROUP_SIZE_MIN + 1);
+
+            short groupCell = pool.get(idx).cell;
+            EOrientation groupOrient = pool.get(idx).orient;
+
+            List<MonsterGroup.Member> members = new ArrayList<>(size);
+            for(int i = 0; i < size; i++) {
+                RawSpawnEntry e = pool.get(idx + i);
+                members.add(new MonsterGroup.Member(e.tpl, e.grade));
+            }
+            idx += size;
+
+            Short naturalCell = map.findNearestValidMonsterCell(groupCell);
             if(naturalCell == null) {
-                logger.warn("MonstersData : spawn ignoré sur map {} cellule {} : aucune cellule naturelle valide trouvée",
-                    map.getId(), pending.requestedCell);
+                logger.warn("MonstersData : spawn ignoré sur map {} cellule {} : aucune cellule valide",
+                    map.getId(), groupCell);
                 continue;
             }
 
             short cell = naturalCell.shortValue();
-            if(cell != pending.requestedCell) {
-                logger.debug("MonstersData : cellule spawn déplacée naturellement sur map {} : {} -> {}",
-                    new Object[] { map.getId(), pending.requestedCell, cell });
+            if(cell != groupCell) {
+                logger.debug("MonstersData : cellule déplacée naturellement sur map {} : {} -> {}",
+                    new Object[] { map.getId(), groupCell, cell });
             }
 
-            MonsterGroup group = new MonsterGroup(map, cell, pending.orientation, pending.members);
+            MonsterGroup group = new MonsterGroup(map, cell, groupOrient, members);
             map.addMonsterGroup(group);
             count++;
             logger.debug("MonstersData : groupe {} spawné sur map {} cellule {} ({} monstres)",
@@ -208,14 +221,17 @@ public class MonstersData {
         return count;
     }
 
-    private static final class PendingMonsterGroup {
-        private final short requestedCell;
-        private final EOrientation orientation;
-        private final List<MonsterGroup.Member> members = new ArrayList<>();
+    private static final class RawSpawnEntry {
+        final MonsterTemplate tpl;
+        final int grade;
+        final short cell;
+        final EOrientation orient;
 
-        private PendingMonsterGroup(short requestedCell, EOrientation orientation) {
-            this.requestedCell = requestedCell;
-            this.orientation = (orientation != null) ? orientation : EOrientation.SOUTH;
+        RawSpawnEntry(MonsterTemplate tpl, int grade, short cell, EOrientation orient) {
+            this.tpl = tpl;
+            this.grade = grade;
+            this.cell = cell;
+            this.orient = orient != null ? orient : EOrientation.SOUTH;
         }
     }
 

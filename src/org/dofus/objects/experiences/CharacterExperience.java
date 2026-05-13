@@ -47,7 +47,7 @@ public class CharacterExperience extends AExperience {
 	public void onLevelUp(long exp) {
 		level++;
 		template = ExperiencesData.get(level);
-		character.setLife((short) Math.min(character.getLife() + 5, character.getLifeMax()));
+		character.setLife(character.getLifeMax());
 		character.setStatsPoint((short) (character.getStatsPoint() + 5));
 		character.setSpellPoint((short) (character.getSpellPoint() + 1));
 

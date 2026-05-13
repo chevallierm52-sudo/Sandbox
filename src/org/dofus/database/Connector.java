@@ -1,5 +1,8 @@
 package org.dofus.database;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -33,7 +36,27 @@ public class Connector {
 	}
 
 	private static Connection openConnection() throws SQLException {
-		return DriverManager.getConnection(url, dbUsername, dbPassword);
+		Connection conn = DriverManager.getConnection(url, dbUsername, dbPassword);
+		return wrapLogging(conn);
+	}
+
+	private static Connection wrapLogging(final Connection conn) {
+		return (Connection) Proxy.newProxyInstance(
+			Connection.class.getClassLoader(),
+			new Class<?>[]{ Connection.class },
+			new InvocationHandler() {
+				@Override
+				public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+					if(method.getName().startsWith("prepareStatement") && args != null && args.length >= 1)
+						logger.debug("[SQL] {}", args[0]);
+					try {
+						return method.invoke(conn, args);
+					} catch(java.lang.reflect.InvocationTargetException e) {
+						throw e.getCause();
+					}
+				}
+			}
+		);
 	}
 
 	public static Connection acquire() {

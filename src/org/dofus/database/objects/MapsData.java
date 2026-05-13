@@ -40,6 +40,8 @@ public class MapsData {
 							reader.getShort("subarea"),
 							reader.getString("key"),
 							reader.getString("date"),
+							optionalString(reader, "mapKey"),
+							optionalString(reader, "cellsData"),
 							reader.getBoolean("subscriberArea"),
 							reader.getString("places")
 					);
@@ -69,9 +71,9 @@ public class MapsData {
 					if(!triggers.containsKey(reader.getInt("id"))) {
 						TriggerTemplate trigger = new TriggerTemplate(
 								reader.getInt("id"),
-								reader.getShort("map"),
+								reader.getInt("map"),
 								reader.getShort("cell"),
-								reader.getShort("nextMap"),
+								reader.getInt("nextMap"),
 								reader.getShort("nextCell")
 						);
 						triggers.put(trigger.getId(), trigger);
@@ -117,5 +119,14 @@ public class MapsData {
 			Connector.release(conn);
 		}
 		return null;
+	}
+
+	private static String optionalString(ResultSet reader, String column) throws SQLException {
+		try {
+			String value = reader.getString(column);
+			return reader.wasNull() ? null : value;
+		} catch(SQLException e) {
+			return null;
+		}
 	}
 }

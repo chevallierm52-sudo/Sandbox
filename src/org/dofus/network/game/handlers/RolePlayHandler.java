@@ -105,10 +105,10 @@ public class RolePlayHandler extends GameClientHandler {
 			case 'E':
 				ExchangeParser.parse(character, session, packet);
 			break;
-			/*case 'e':
+			case 'e':
 				parseEnvironementPacket(packet);
 			break;
-			case 'F':
+			/*case 'F':
 				parseFriendPacket(packet);
 			break;*/
 			case 'f':
@@ -226,6 +226,26 @@ public class RolePlayHandler extends GameClientHandler {
 			case 'Y': //Character state
 				BasicParser.states(packet);
 				break;
+		}
+	}
+
+	private void parseEnvironementPacket(String packet) {
+		switch(packet.charAt(1)) {
+			case 'D': // eD{orientation} — changement d'orientation (clic droit sur le personnage)
+				if(packet.length() < 3) break;
+				try {
+					int orientOrd = Integer.parseInt(packet.substring(2));
+					org.dofus.objects.actors.EOrientation orientation = org.dofus.objects.actors.EOrientation.valueOf(orientOrd);
+					if(orientation == null) break;
+					character.setCurrentOrientation(orientation);
+					String broadcast = "eD" + character.getId() + "|" + orientOrd;
+					for(Characters actor : character.getCurrentMap().getActors().values()) {
+						IoSession actorSession = WorldData.getSessionByAccount().get(actor.getOwner());
+						if(actorSession != null && actorSession.isConnected())
+							actorSession.write(broadcast);
+					}
+				} catch(NumberFormatException e) { /* ignore */ }
+			break;
 		}
 	}
 

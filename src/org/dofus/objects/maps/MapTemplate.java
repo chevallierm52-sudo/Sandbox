@@ -10,13 +10,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.dofus.database.objects.InteractiveObjectCellsData;
 import org.dofus.database.objects.InteractiveObjectsData;
-import org.dofus.database.objects.MapCellWalkabilityData;
+import org.dofus.database.objects.OfficialInteractiveCellsData;
 import org.dofus.objects.actors.Characters;
 import org.dofus.objects.actors.EOrientation;
 import org.dofus.objects.actors.NPC;
 import org.dofus.objects.monsters.MonsterGroup;
+import org.dofus.utils.Formulas;
+import org.dofus.utils.InteractiveObjectService;
 import org.dofus.utils.MapCellDecoder;
 import org.dofus.utils.StringUtils;
 
@@ -28,6 +29,8 @@ public class MapTemplate {
     private short subarea;
     private String key;
     private String date;
+    private String mapKey;
+    private String mapData;
     private boolean subscriberArea;
     private String places;
 
@@ -41,17 +44,24 @@ public class MapTemplate {
     private volatile boolean monsterGroupsSpawned = false;
  
     public MapTemplate(int id, byte abscissa, byte ordinate, byte width, byte height, short subarea, String key, String date, boolean subscriberArea, String places) {
+        this(id, abscissa, ordinate, width, height, subarea, key, date, null, null, subscriberArea, places);
+    }
+
+    public MapTemplate(int id, byte abscissa, byte ordinate, byte width, byte height, short subarea, String key, String date, String mapKey, String cellsData, boolean subscriberArea, String places) {
         this.id = id;
         this.abscissa = abscissa;
         this.ordinate = ordinate;
         this.width = width;
         this.height = height;
         this.subarea = subarea;
-        this.key = key;
-        this.date = date;
+        this.key = key == null ? "" : key;
+        this.date = date == null ? "" : date;
+        this.mapKey = mapKey == null ? "" : mapKey;
+        this.mapData = cellsData != null && !cellsData.isEmpty() ? cellsData : this.key;
         this.subscriberArea = subscriberArea;
         this.places = places;
-        this.cells.putAll(MapCellDecoder.decode(key, date));
+        this.cells.putAll(MapCellDecoder.decode(this.mapData, getDecodeKey()));
+        normalizeInteractiveWalkability();
         this.preferredSpawnCells.addAll(MapCellDecoder.decodePlacementCells(places));
     }
 
@@ -80,11 +90,19 @@ public class MapTemplate {
     }
 
     public String getKey() {
-        return key;
+        return mapKey == null || mapKey.isEmpty() ? key : mapKey;
     }
 
     public String getDate() {
         return date;
+    }
+
+    public String getMapData() {
+        return mapData;
+    }
+
+    private String getDecodeKey() {
+        return mapKey == null || mapKey.isEmpty() ? date : mapKey;
     }
 
     public boolean isSubscriberArea() {
@@ -104,6 +122,20 @@ public class MapTemplate {
         return !cells.isEmpty();
     }
 
+    private void normalizeInteractiveWalkability() {
+        if(cells.isEmpty()) return;
+        for(Cell cell : cells.values()) {
+            if(cell == null) continue;
+            if(Formulas.isWaypointCell(id, cell.getId())) {
+                cell.forceRoleplayWalkable(false);
+                continue;
+            }
+            if(cell.hasKnownInteractiveObject()) {
+                cell.forceRoleplayWalkable(!InteractiveObjectsData.isBlocking(cell.getLayerObject2Num()));
+            }
+        }
+    }
+
     /**
      * Validation centrale d'une cellule roleplay.
      * Quand les donnees cellules sont decodees, on refuse les cases inactives/non marchables.
@@ -116,32 +148,56 @@ public class MapTemplate {
     public boolean isValidActorCell(short cellId, boolean allowTriggers) {
         if(!isValidCellId(cellId)) return false;
         if(!allowTriggers && triggers.containsKey(cellId)) return false;
-        if(isBlockingInteractiveCell(cellId)) return false;
+        if(Formulas.isWaypointCell(id, cellId)) return false;
         if(hasDecodedCells()) {
             Cell cell = cells.get(cellId);
             if(cell == null || !cell.isWalkable()) return false;
+            if(cell.hasBlockingInteractiveObject()) return false;
+            if(isInteractiveActionCell(cellId)) return false;
         } else {
-            Boolean override = MapCellWalkabilityData.getOverride(id, cellId);
-            if(Boolean.FALSE.equals(override)) return false;
-            // Sans donnees map completes, on reste jouable : les cellules inconnues sont acceptees
-            // sauf si une collision explicite (puits, trigger interdit, occupation) les bloque.
+            // Sans donnees map completes, on reste jouable : les cellules inconnues sont acceptees.
+            // Le mode officiel priorise les donnees map decodees et interactive_objects_data.
+            if(isInteractiveActionCell(cellId)) return false;
         }
         return !isCellOccupied(cellId);
     }
 
-    public boolean isBlockingInteractiveCell(short cellId) {
+    public boolean hasBlockingInteractiveObject(short cellId) {
         if(!isValidCellId(cellId)) return false;
-        if(InteractiveObjectCellsData.isBlocking(id, cellId)) return true;
+        if(Formulas.isWaypointCell(id, cellId)) return true;
         if(hasDecodedCells()) {
             Cell cell = cells.get(cellId);
             return cell != null && cell.hasBlockingInteractiveObject();
         }
-        return false;
+        return OfficialInteractiveCellsData.isBlocking(id, cellId);
     }
 
-    public void learnWalkableCell(short cellId, String reason) {
-        if(!isValidCellId(cellId) || hasDecodedCells() || isBlockingInteractiveCell(cellId)) return;
-        MapCellWalkabilityData.markWalkable(id, cellId, reason);
+    public boolean isReadyInteractiveDestination(short cellId) {
+        if(!isValidCellId(cellId) || !InteractiveObjectService.isReady(id, cellId)) return false;
+        return isInteractiveActionCell(cellId);
+    }
+
+    public boolean isInteractiveActionCell(short cellId) {
+        if(!isValidCellId(cellId)) return false;
+        if(Formulas.isWaypointCell(id, cellId)) return true;
+        if(hasDecodedCells()) {
+            Cell cell = cells.get(cellId);
+            return cell != null && (cell.hasInteractiveObject() || cell.hasKnownInteractiveObject()
+                    || cell.hasBlockingInteractiveObject());
+        }
+        return OfficialInteractiveCellsData.isInteractiveCell(id, cellId);
+    }
+
+    public boolean isOfficialInteractiveCell(short cellId) {
+        if(!isValidCellId(cellId)) return false;
+        return Formulas.isWaypointCell(id, cellId) || OfficialInteractiveCellsData.isInteractiveCell(id, cellId);
+    }
+
+    public int getOfficialInteractiveGfx(short cellId) {
+        Cell cell = cells.get(cellId);
+        if(cell != null && cell.getLayerObject2Num() > 0) return cell.getLayerObject2Num();
+        OfficialInteractiveCellsData.OfficialInteractiveCell official = OfficialInteractiveCellsData.get(id, cellId);
+        return official != null ? official.getGfxId() : 0;
     }
 
     /** Cellule valide pour un groupe de monstres : pas de soleil/trigger et pas trop colle aux autres groupes. */
@@ -344,12 +400,12 @@ public class MapTemplate {
 	public static class TriggerTemplate {
 		
 	    private int id;
-	    private short map;
+	    private int map;
 	    private short cellId;
-	    private short nextMap;
+	    private int nextMap;
 	    private short nextCellId;
 
-	    public TriggerTemplate(int id, short map, short cellId, short nextMap, short nextCellId) {
+	    public TriggerTemplate(int id, int map, short cellId, int nextMap, short nextCellId) {
 	        this.id = id;
 	        this.map = map;
 	        this.cellId = cellId;
@@ -361,7 +417,7 @@ public class MapTemplate {
 	        return id;
 	    }
 
-	    public short getMap() {
+	    public int getMap() {
 	        return map;
 	    }
 
@@ -369,7 +425,7 @@ public class MapTemplate {
 	        return cellId;
 	    }
 
-	    public short getNextMap() {
+	    public int getNextMap() {
 	        return nextMap;
 	    }
 
@@ -434,6 +490,7 @@ public class MapTemplate {
 	    private int layerObject1Num;
 	    private int layerObject2Num;
 	    private boolean layerObject2Interactive;
+	    private Boolean roleplayWalkable;
 	    private Point position;
 
 	    public Cell(short id, boolean lineOfSight, MovementType movementType, int groundLevel, int groundSlope, Point position) {
@@ -496,7 +553,12 @@ public class MapTemplate {
 	    }
 
 	    public boolean isWalkable() {
+	        if(roleplayWalkable != null) return roleplayWalkable.booleanValue();
 	        return active && movementType != MovementType.Unwalkable;
+	    }
+
+	    public void forceRoleplayWalkable(boolean walkable) {
+	        this.roleplayWalkable = Boolean.valueOf(walkable);
 	    }
 
 	    public boolean hasInteractiveObject() {

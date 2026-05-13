@@ -35,6 +35,10 @@ public class Item {
         return new Item(uid, template, quantity, position, null);
     }
 
+    public static Item createMax(long uid, ItemTemplate template, int quantity, int position) {
+        return new Item(uid, template, quantity, position, maxFromTemplate(template));
+    }
+
     public long getUid() { return uid; }
     public ItemTemplate getTemplate() { return template; }
     public void setTemplate(ItemTemplate template) { this.template = template; }
@@ -150,6 +154,14 @@ public class Item {
         if(template == null) return result;
         if(template.getTypeId() == 18) return createInitialPetEffects(template);
         for(ItemEffect e : template.getEffects()) result.add(e.rollInstance());
+        return normalizeEffects(template, result);
+    }
+
+    private static List<ItemEffect> maxFromTemplate(ItemTemplate template) {
+        List<ItemEffect> result = new ArrayList<ItemEffect>();
+        if(template == null) return result;
+        if(template.getTypeId() == 18) return createInitialPetEffects(template);
+        for(ItemEffect effect : template.getEffects()) result.add(effect.maxInstance());
         return normalizeEffects(template, result);
     }
 

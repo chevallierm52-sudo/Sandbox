@@ -33,6 +33,8 @@ public class Characters implements IActor {
 	private MapTemplate currentMap;
 	private short currentCell;
 	private EOrientation currentOrientation;
+	private int saveMap;
+	private short saveCell;
 
 	private Right right;
 	private Restriction restriction;
@@ -209,6 +211,22 @@ public class Characters implements IActor {
 
 	public void setCurrentOrientation(EOrientation currentOrientation) {
 		this.currentOrientation = currentOrientation;
+	}
+
+	public int getSaveMap() {
+		return saveMap > 0 ? saveMap : (currentMap != null ? currentMap.getId() : 0);
+	}
+
+	public void setSaveMap(int saveMap) {
+		this.saveMap = saveMap;
+	}
+
+	public short getSaveCell() {
+		return saveCell > 0 ? saveCell : currentCell;
+	}
+
+	public void setSaveCell(short saveCell) {
+		this.saveCell = saveCell;
 	}
 
 	public Right getRight() {

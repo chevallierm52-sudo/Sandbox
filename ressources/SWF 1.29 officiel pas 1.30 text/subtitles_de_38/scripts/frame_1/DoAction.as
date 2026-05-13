@@ -1,0 +1,14 @@
+FILE_BEGIN = true;
+System.security.allowDomain(_parent._url);
+VERSION = 38;
+SUB = new Array();
+SUB[8] = new Array();
+SUB[8][1] = "Es gibt 6 Artefakte in dieser Welt,\ndie Macht und Reichtum versprechen.";
+SUB[8][2] = "Die Rede ist von den sechs Dracheneiern.\n \"Dofus\" werden sie genannt.";
+SUB[8][3] = "Sie wurden ihren Wächtern entrissen...";
+SUB[8][4] = "Daraufhin wurden die Elemente entfesselt und \nalle Monster wetzten ihre Krallen.";
+SUB[8][5] = "Die Abenteurer schärften ihre Klingen,\nund ein blutiges Gemetzel nahm seinen Lauf!";
+SUB[8][6] = "Doch nun ist die Zeit des Wandels gekommen,\ndenn das Schicksal hat dich nach Incarnam geführt...";
+SUB[8][7] = "Sei es als Ritter, Heiler oder Beschwörer.";
+SUB[8][8] = "Finde die Dofus,\nund werde der Held, den die Welt erwartet!";
+FILE_END = true;

@@ -1,5 +1,57 @@
 # Changelog
 
+## [Phase 25 - Commande admin .align et fix zaapis] - 2026-05-13
+
+- `AdminParser.java` : commande `.align <nom> <type>` ajoutée. Fixe l'alignement d'un personnage connecté (0=neutre, 1=Bonta, 2=Brakmar), sauvegarde en BDD, envoie `ZS{type}` au client pour mettre à jour l'interface immédiatement. Le panel zaapis (`Wc`) s'ouvre correctement ensuite via skill 157. Investigation depuis `Subway.as` (sources StarLoco client) : `Wv` reçu = close panel (`Subway.onLeave`), `Wc{data}` = open panel (`Subway.onCreate`). La colonne `alignment` était déjà présente en BDD mais valait 0 (neutre) — le serveur renvoyait `Wv` correctement selon l'alignement.
+
+## [Phase 24 - Orientation personnage et SQL logging] - 2026-05-13
+
+- `RolePlayHandler.java` : `case 'e'` décommenté et `parseEnvironementPacket()` ajouté. Le paquet `eD{n}` (clic droit → changer orientation) met maintenant à jour `character.setCurrentOrientation()` et diffuse `eD{characterId}|{n}` à tous les acteurs de la carte.
+- `Connector.java` : chaque connexion JDBC est maintenant enveloppée dans un `Proxy` qui intercepte tous les appels `prepareStatement(sql, ...)` et log le SQL au niveau DEBUG (`[SQL] ...`). Aucun changement dans les classes Data — le logging est automatique sur toutes les requêtes préparées.
+
+## [Phase 23 - Groupes monstres multi-membres et cellule safe minimap] - 2026-05-13
+
+- `MonstersData.java` : les groupes de monstres ont maintenant plusieurs membres (2–5) au lieu d'un seul. Le code collecte toutes les entrées `monster_spawns` dans un pool, mélange aléatoirement, puis découpe en groupes de `GROUP_SIZE_MIN=2` à `GROUP_SIZE_MAX=5` membres. Chaque restart produit des groupes de taille différente. La classe interne `PendingMonsterGroup` est remplacée par `RawSpawnEntry`. Imports `LinkedHashMap`/`Map` supprimés, `Collections`/`Random` ajoutés.
+- `BasicParser.java` : `moveByClickMap()` (paquet `BaM`) vérifie maintenant que la cellule d'arrivée est walkable avant de téléporter. Si le zaap de la carte cible ou la cellule 200 de fallback est non-walkable, on appelle `map.findNearestValidActorCell()` pour trouver la cellule libre la plus proche — même logique que `WaypointParser.getArrivalCell()`.
+
+## [Phase 22 - Stabilisation téléport et persistance] - 2026-05-13
+
+- `RolePlayMovement.java` : `teleport()` vide maintenant la pile d'actions (`client.getActions().clear()`) avant de changer de carte. Avant, un déplacement en cours restait dans la pile après un BaM ou un clic mini-map, laissant le joueur bloqué en état BUSY sur la nouvelle carte.
+- `WaypointParser.java` : `use()` appelle `CharactersData.update(character)` immédiatement après le téléport zaap/zaapi. La position `currentMap`/`currentCell` est maintenant sauvegardée en BDD dès l'utilisation, pas seulement à la déconnexion.
+
+## [Phase 21 - Cleanup zaapis, walkability et loaders] - 2026-05-13
+
+- `EConstants.java` : suppression de 10 doublons exacts dans `BRAKMAR_ZAAPI` (même mapId + cellId). Le panel zaapi Brakmar affichait des destinations en double. 45 entrées → 35 uniques.
+- `WaypointParser.java` : correction du packet `Wc` (panel zaapi) — le champ `mapRespawn` envoyait `currentMap.getId()` au lieu de `character.getSaveMap()`, incohérent avec le panel zaap `WC`.
+- `InteractiveObjectsData.java` : correction du fallback `isWalkable()` — les arbres (frêne, chêne, orme, bambou...), les minerais et les poissons étaient incorrectement marqués traversables par le check sur le nom. Seuls les céréales (blé, orge, avoine, houblon, lin, seigle, riz, malt, chanvre) et les herbes (menthe, orchidée, trèfle, edelweiss, pandouille) restent traversables dans ce fallback ; tout le reste reste bloquant.
+- `CharactersData.java` : `ensureSaveColumns()` ne déclenche plus `ALTER TABLE IF NOT EXISTS` à chaque sauvegarde de personnage. Un flag statique `volatile` garantit qu'il s'exécute une seule fois au premier appel.
+- `MapsData.java` : `optionalString()` utilise maintenant un `try/catch` direct au lieu d'itérer les métadonnées `ResultSet` via `hasColumn()` pour lire `mapKey` et `cellsData`. Suppression de l'import `ResultSetMetaData` devenu inutile.
+
+## [Phase 20 - Cellules interactives et zaaps officiels] - 2026-05-12
+
+- `sql/starloco_maps_triggers_patch.sql` importe les vraies maps/triggers StarLoco (`11117` maps, `29304` triggers) dans `map_templates` et `map_triggers`, avec colonnes officielles `mapKey`, `cellsData` et `capabilities`.
+- `sql/starloco_maps_triggers_patch_v2.sql` fournit la version robuste du patch SQL : un `INSERT` par map et paquets triggers reduits pour eviter les erreurs MySQL `2006/2013 Server has gone away`.
+- `sql/starloco_maps_triggers_v3_parts/` decoupe l'import SQL en plusieurs fichiers : metadata legeres, `cellsData` en chunks `UPDATE CONCAT` de 3000 caracteres, puis triggers. Cette version evite aussi l'erreur MySQL `1153 Got a packet bigger than max_allowed_packet`.
+- `MapsData.java` et `MapTemplate.java` acceptent maintenant le schema StarLoco sans casser l'ancien format : les cellules sont decodees depuis `cellsData` avec la vraie `mapKey`, puis fallback sur `key/date`.
+- `MapCellDecoder.java` prepare la cle hex officielle StarLoco avant dechiffrement et conserve le decodeur legacy pour les dumps historiques.
+- Les triggers de map passent en IDs `int` cote SQL/Java pour importer StarLoco sans truncation.
+- `InteractiveObjectsData.java` integre le mapping StarLoco officiel `gfx -> objet interactif -> type/skills/walkable`. Les ressources explicitement traversables (ble, orge, avoine, lin, riz, plantes, etc.) restent traversables meme si une vieille BDD les marque `walkable=0`; puits, zaaps/zaapis, poubelles, coffres et portes restent bloquants.
+- Suppression des anciennes rustines `MapCellWalkabilityData`, `InteractiveObjectCellsData`, `map_cell_walkability` et `interactive_object_cells`. Le serveur ne maintient plus de tables paralleles qui contredisent les donnees officielles de map.
+- `MapTemplate.java` applique la regle officielle : une ressource walkable peut etre traversee, mais une cellule interactive prete ne peut plus etre la cellule d'arrivee. Les objets non walkable bloquent toujours le passage.
+- `InteractiveObjectService.java` branche les ressources metiers StarLoco sur `GA500/GA501/GDF` avec le troisieme parametre d'animation `unknow` : paysan, alchimiste, bucheron, mineur, pecheur, tas de patates et puits donnent maintenant les ressources correspondantes a l'inventaire avec sauvegarde SQL et mise a jour pods.
+- `WaypointParser.java` gere maintenant `GA500` zaap/zaapi sans fausse animation de recolte : skill 114 ouvre le panel, skill 44 sauvegarde la position zaap, skill 157 ouvre les zaapis disponibles.
+- `CharacterExperience.java` soigne maintenant le personnage a 100% de ses PV max au level-up.
+- `AdminParser.java`, `Item.java`, `ItemEffect.java` : les commandes menu admin `BA!item` / `BA!getitem` creent les objets avec jets maximum.
+- `sql/interactive_objects_official_patch.sql` ajoute une migration pour aligner `interactive_objects_data` avec les vrais noms officiels StarLoco accentues, ajouter `saveMap/saveCell`, et supprimer les tables de walkability apprises.
+- Les deplacements tronquent maintenant explicitement le dernier pas quand la cible est une `cellAction` : le joueur s'arrete devant le puits, le zaap, le zaapi ou la ressource, puis l'action s'execute au contact.
+- Les panels zaap/zaapi envoient maintenant les destinations au format `mapId;cout`, ce qui corrige le cout affiche en `NaN` cote client; le TP arrive sur une cellule libre proche du zaap/zaapi au lieu de poser le personnage sur la cellule interactive.
+- Les cellules officielles zaap/zaapi sont maintenant bloquees par `Formulas.isWaypointCell(...)` meme si le decodeur map ne marque pas correctement le layer interactif. Astrub `7411,311` ne peut donc plus etre une cellule d'arrivee de marche.
+- Liste zaap recalee depuis les scripts StarLoco : Brakmar passe de `5295,579` a `5295,561`, Duty Free passe a `10114,282`, et les panels `WC/Wc` respectent le format client `mapCourante|mapRespawn|mapId;cout|...`.
+- `MapTemplate` normalise maintenant la walkability au chargement : cellules waypoint/objets bloquants forcees non walkable, ressources officielles type ble/avoine/malt forcees walkable pour la traversee.
+- `RolePlayMovement` n'utilise plus l'ancien recalcul directionnel fragile du chemin client. Il garde le chemin envoye, mais si l'arrivee vise une cellule action/non walkable, il remplace la destination par la case precedente dans la meme direction.
+- Ajout de `ressources/starloco_interactive_cells.csv` genere depuis les scripts maps StarLoco : 18 378 cellules interactives officielles `mapId;cellId;gfxId`. Cela corrige les maps SQL sans cellsData complet, par exemple Astrub ou le vrai objet zaap est sur la cellule `7411,297` alors que la cellule de destination/respawn zaap est `7411,311`.
+- `OfficialInteractiveCellsData.java` applique le modele StarLoco `GameCase.isWalkable(checkObject, inFight, targetCell)` en fallback : objet non walkable bloque la traversee, ressource walkable peut etre traversee, aucune cellule interactive prete ne peut etre la cellule d'arrivee.
+
 ## [Phase 19 - Familier PV et clic ressource officiel] - 2026-05-12
 
 ### Familiers

@@ -1,0 +1,14 @@
+FILE_BEGIN = true;
+System.security.allowDomain(_parent._url);
+VERSION = 29;
+SUB = new Array();
+SUB[8] = new Array();
+SUB[8][1] = "Six talismans exist in this World,\nbearing mysterious powers and prosperity.";
+SUB[8][2] = "Six Dragon eggs, the sacred Dofus,";
+SUB[8][3] = "Were stolen from their protectors...";
+SUB[8][4] = "And with that, the elements were unleashed, \nMonsters sharpened their fangs,";
+SUB[8][5] = "Adventurers brandished their weapons,\nAnd there was joyous carnage!";
+SUB[8][6] = "But the time has come!\nYour destiny now takes you to Incarnam...";
+SUB[8][7] = "Choose your path as a knight, a healer or a summoner.";
+SUB[8][8] = "Find the Dofus,\nAnd become the hero the World has been waiting for!";
+FILE_END = true;

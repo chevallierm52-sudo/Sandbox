@@ -169,6 +169,36 @@ public class ItemEffect {
         return fixed(effectId, value);
     }
 
+    public ItemEffect maxInstance() {
+        int value = maxRoll();
+        return fixed(effectId, value);
+    }
+
+    public int maxRoll() {
+        Integer diceTextMax = maxDiceText(specialText);
+        if(diceTextMax != null) return diceTextMax.intValue();
+        if(dice > 0 && min >= dice) return Math.max(dice, min);
+        if(min > 0 && max >= min) return Math.max(min, max);
+        if(dice > 0) return dice;
+        if(min > 0) return min;
+        return max;
+    }
+
+    private static Integer maxDiceText(String text) {
+        if(text == null) return null;
+        String clean = text.trim();
+        if(clean.isEmpty() || "0".equals(clean)) return null;
+
+        Matcher m = DICE_PATTERN.matcher(clean);
+        if(!m.matches()) return null;
+
+        int count = Integer.parseInt(m.group(1));
+        int sides = Integer.parseInt(m.group(2));
+        int bonus = m.group(3) != null ? Integer.parseInt(m.group(3)) : 0;
+        if(count <= 0 || sides <= 0) return null;
+        return count * sides + bonus;
+    }
+
     public String toDofusString() {
         return Integer.toHexString(effectId)
             + "#" + Integer.toHexString(dice)
