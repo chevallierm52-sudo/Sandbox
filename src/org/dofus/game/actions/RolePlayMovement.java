@@ -2,20 +2,24 @@ package org.dofus.game.actions;
 
 import org.apache.mina.core.session.IoSession;
 import org.dofus.database.objects.MapsData;
+import org.dofus.game.fight.FightTurn;
 import org.dofus.network.game.GameClient;
 import org.dofus.network.game.handlers.parsers.FightParser;
-import org.dofus.objects.maps.MapTemplate;
-import org.dofus.objects.maps.MapTemplate.Cell;
-import org.dofus.objects.maps.MapTemplate.TriggerTemplate;
 import org.dofus.objects.WorldData;
 import org.dofus.objects.actors.Characters;
 import org.dofus.objects.actors.EOrientation;
+import org.dofus.objects.maps.MapTemplate;
+import org.dofus.objects.maps.MapTemplate.Cell;
+import org.dofus.objects.maps.MapTemplate.TriggerTemplate;
+import org.dofus.objects.monsters.MonsterGroup;
 import org.dofus.utils.GroundItemService;
 import org.dofus.utils.InteractiveObjectService;
+import java.util.concurrent.TimeUnit;
 
 public class RolePlayMovement implements IGameAction {
+    private static final int FIGHT_START_DELAY_MS = 100;
 
-	private final GameClient client;
+    private final GameClient client;
     private final String path;
     private String effectivePath = "";
     private short destinationCell = -1;
@@ -25,15 +29,15 @@ public class RolePlayMovement implements IGameAction {
     private int pendingFightGroupId = -1;
     private boolean prepared = false;
     private boolean valid = false;
-    
-	public RolePlayMovement(String path, GameClient client) {
-		this.path = path;
-		this.client = client;
-	}
-	
-	public static void teleport(GameClient client, MapTemplate nextMap, short cellId) {
+
+    public RolePlayMovement(String path, GameClient client) {
+        this.path = path;
+        this.client = client;
+    }
+
+    public static void teleport(GameClient client, MapTemplate nextMap, short cellId) {
         if(nextMap == null)
-        	return;
+            return;
 
         client.getActions().clear();
 
@@ -44,34 +48,31 @@ public class RolePlayMovement implements IGameAction {
             if(actorSession == null || !actorSession.isConnected()) continue;
             actorSession.write(removePacket);
         }
-        
+
         client.getCharacter().getCurrentMap().removeActor(client.getCharacter());
         client.getCharacter().setCurrentMap(nextMap);
         client.getCharacter().setCurrentCell(cellId);
-        
         client.getCharacter().getCurrentMap().addActor(client.getCharacter());
 
         client.getSession().write("GA;2;" + client.getCharacter().getId() + ";");
-        
-        client.getSession().write("GDM|" //Send map data
-    			+ client.getCharacter().getCurrentMap().getId() + "|"
-    			+ client.getCharacter().getCurrentMap().getDate() + "|"
-    			+ client.getCharacter().getCurrentMap().getKey() + "|"
-    			);
-        
+        client.getSession().write("GDM|"
+                + client.getCharacter().getCurrentMap().getId() + "|"
+                + client.getCharacter().getCurrentMap().getDate() + "|"
+                + client.getCharacter().getCurrentMap().getKey() + "|");
     }
-	
-	@Override
-	public GameActionType getActionType() {
-		return GameActionType.MOVEMENT;
-	}
 
-	@Override
-	public void begin() {
-		if(!isValid()) {
-			client.getSession().write("BN");
-			return;
-		}
+    @Override
+    public GameActionType getActionType() {
+        return GameActionType.MOVEMENT;
+    }
+
+    @Override
+    public void begin() {
+        if(!isValid()) {
+            client.getSession().write("BN");
+            return;
+        }
+
         if(!hasMovement()) {
             short cellId = client.getCharacter().getCurrentCell();
             broadcastAction("GA1;4;" + client.getCharacter().getId() + ";"
@@ -79,20 +80,20 @@ public class RolePlayMovement implements IGameAction {
             return;
         }
 
-		broadcastAction("GA1;1;" + client.getCharacter().getId() + ";" + this.getPath());
-	}
+        broadcastAction("GA1;1;" + client.getCharacter().getId() + ";" + this.getPath());
+    }
 
-	@Override
-	public void end() {
+    @Override
+    public void end() {
         preparePath();
-		if(!valid)
-			return;
+        if(!valid)
+            return;
 
         boolean moved = hasMovement();
         short cellId = destinationCell;
+
         if(moved) {
             EOrientation orientation = Cell.decode(effectivePath.charAt(effectivePath.length() - 3));
-
             if(!isValidDestination(cellId)) {
                 client.getSession().write("BN");
                 return;
@@ -100,36 +101,39 @@ public class RolePlayMovement implements IGameAction {
 
             client.getCharacter().setCurrentOrientation(orientation);
             client.getCharacter().setCurrentCell(cellId);
-
             tryPickupGroundItem(cellId);
+            if(client.getSession() != null && client.getSession().isConnected()) {
+                client.getSession().write("BN");
+            }
         }
-        if(runPendingMapAction() || runPendingFight())
+
+        if(runPendingMapAction() || runPendingFight() || runAutoMonsterFight())
             return;
+
         if(!moved)
             return;
 
         TriggerTemplate trigger = client.getCharacter().getCurrentMap().getTriggers().get(cellId);
-
         if(trigger != null)
             teleport(client, MapsData.load(trigger.getNextMap()), trigger.getNextCellId());
-	}
+    }
 
-	@Override
-	public void cancel() {
+    @Override
+    public void cancel() {
         pendingActionCell = -1;
         pendingActionSkill = -1;
         pendingFightGroupId = -1;
-	}
+    }
 
     public void cancel(short cellId) {
-    	client.getCharacter().setCurrentCell(cellId);
+        client.getCharacter().setCurrentCell(cellId);
         cancel();
     }
 
     private void tryPickupGroundItem(short cellId) {
         GroundItemService.pickup(client.getCharacter(), client.getSession(), cellId);
     }
-    
+
     public String getPath() {
         preparePath();
         return "a" + Cell.encode(client.getCharacter().getCurrentCell()) + effectivePath;
@@ -165,6 +169,7 @@ public class RolePlayMovement implements IGameAction {
 
     private void preparePath() {
         if(prepared) return;
+
         prepared = true;
         valid = false;
         effectivePath = "";
@@ -182,6 +187,7 @@ public class RolePlayMovement implements IGameAction {
         short currentCell = client.getCharacter().getCurrentCell();
         short lastValidCell = currentCell;
         StringBuilder acceptedPath = new StringBuilder(path.length());
+
         try {
             for(int i = 0; i + 2 < path.length(); i += 3) {
                 EOrientation orientation = Cell.decode(path.charAt(i));
@@ -191,11 +197,29 @@ public class RolePlayMovement implements IGameAction {
                 if(!isValidCellId(targetCell)) return;
 
                 boolean lastStep = i + 3 >= path.length();
+                boolean targetHasMonsterGroup = findMonsterGroupOnCell(map, targetCell) != null;
                 boolean blockedCell = map.hasBlockingInteractiveObject(targetCell) || !isWalkablePathCell(map, targetCell);
                 boolean blockedDestination = lastStep && !isValidDestination(targetCell);
+
+                // Fix combat PvM : sur le client 1.29, le clic sur un groupe peut n'envoyer
+                // qu'un GA001 de déplacement. Le groupe occupe une cellule non valable pour
+                // le joueur : on conserve donc la cellule cible pour lancer le combat après GKK.
+                if(targetHasMonsterGroup) {
+                    blockedTargetCell = targetCell;
+                    short stopCell = findStopBeforeTarget(map, lastValidCell, orientation, targetCell);
+
+                    if(stopCell != lastValidCell) {
+                        acceptedPath.append(path.charAt(i));
+                        acceptedPath.append(Cell.encode(stopCell));
+                        lastValidCell = stopCell;
+                    }
+                    break;
+                }
+
                 if(blockedCell || blockedDestination) {
                     blockedTargetCell = targetCell;
                     short stopCell = findStopBeforeTarget(map, lastValidCell, orientation, targetCell);
+
                     if(stopCell != lastValidCell) {
                         acceptedPath.append(path.charAt(i));
                         acceptedPath.append(Cell.encode(stopCell));
@@ -225,54 +249,60 @@ public class RolePlayMovement implements IGameAction {
 
     private boolean isWalkablePathCell(MapTemplate map, short cellId) {
         if(cellId == client.getCharacter().getCurrentCell()) return true;
+
         MapTemplate.Cell cell = map.getCell(cellId);
         if(map.hasDecodedCells() && (cell == null || !cell.isWalkable())) return false;
+
         return true;
     }
 
     private short findStopBeforeTarget(MapTemplate map, short fallbackCell, EOrientation orientation, short targetCell) {
         short previousCell = getPreviousCellFromDirection(targetCell, orientation, map);
+
         if(previousCell != targetCell && isValidCellId(previousCell)
                 && previousCell != blockedTargetCell && isValidDestination(previousCell)) {
             return previousCell;
         }
 
-        Short nearest = map.findNearestValidActorCell(targetCell, true);
+        Short nearest = map.findNearestValidActorCell(targetCell, true, client.getCharacter().getId());
         if(nearest != null && nearest.shortValue() != blockedTargetCell) return nearest.shortValue();
+
         return fallbackCell;
     }
 
     private short getPreviousCellFromDirection(short cellId, EOrientation orientation, MapTemplate map) {
         int width = map != null && map.getWidth() > 0 ? map.getWidth() : 14;
         int previous;
+
         switch(orientation) {
-        case EAST:
-            previous = cellId - 1;
-            break;
-        case SOUTH_EAST:
-            previous = cellId - width;
-            break;
-        case SOUTH:
-            previous = cellId - (width * 2 - 1);
-            break;
-        case SOUTH_WEST:
-            previous = cellId - (width - 1);
-            break;
-        case WEST:
-            previous = cellId + 1;
-            break;
-        case NORTH_WEST:
-            previous = cellId + width;
-            break;
-        case NORTH:
-            previous = cellId + (width * 2 - 1);
-            break;
-        case NORTH_EAST:
-            previous = cellId + width - 1;
-            break;
-        default:
-            return -1;
+            case EAST:
+                previous = cellId - 1;
+                break;
+            case SOUTH_EAST:
+                previous = cellId - width;
+                break;
+            case SOUTH:
+                previous = cellId - (width * 2 - 1);
+                break;
+            case SOUTH_WEST:
+                previous = cellId - (width - 1);
+                break;
+            case WEST:
+                previous = cellId + 1;
+                break;
+            case NORTH_WEST:
+                previous = cellId + width;
+                break;
+            case NORTH:
+                previous = cellId + (width * 2 - 1);
+                break;
+            case NORTH_EAST:
+                previous = cellId + width - 1;
+                break;
+            default:
+                return -1;
         }
+
         return (short) previous;
     }
 
@@ -289,22 +319,65 @@ public class RolePlayMovement implements IGameAction {
         pendingActionSkill = -1;
 
         if(GroundItemService.pickup(client.getCharacter(), client.getSession(), cellId)) return true;
+
         InteractiveObjectService.use(client.getCharacter(), client.getSession(), cellId, skillId);
         return true;
     }
 
     private boolean runPendingFight() {
         if(pendingFightGroupId < 0) return false;
+
         int groupId = pendingFightGroupId;
         pendingFightGroupId = -1;
-        FightParser.initiateFightVsMonsters(client.getCharacter(), client.getSession(), groupId);
+        startFightAfterArrival(groupId);
         return true;
+    }
+
+    private boolean runAutoMonsterFight() {
+        if(blockedTargetCell < 0)
+            return false;
+
+        MapTemplate map = client.getCharacter().getCurrentMap();
+        if(map == null)
+            return false;
+
+        MonsterGroup group = findMonsterGroupOnCell(map, blockedTargetCell);
+        if(group == null)
+            return false;
+
+        blockedTargetCell = -1;
+        startFightAfterArrival(group.getId());
+        return true;
+    }
+
+    private void startFightAfterArrival(final int groupId) {
+        final Characters character = client.getCharacter();
+        final IoSession session = client.getSession();
+        FightTurn.schedule(new Runnable() {
+            public void run() {
+                if(character == null || session == null || !session.isConnected()) return;
+                if(FightParser.getFightForCharacter(character) != null) return;
+                FightParser.initiateFightVsMonsters(character, session, groupId);
+            }
+        }, FIGHT_START_DELAY_MS, TimeUnit.MILLISECONDS);
+    }
+
+    private MonsterGroup findMonsterGroupOnCell(MapTemplate map, short cellId) {
+        if(map == null)
+            return null;
+
+        for(MonsterGroup group : map.getMonsterGroups().values()) {
+            if(group != null && group.getCell() == cellId)
+                return group;
+        }
+
+        return null;
     }
 
     private boolean isValidDestination(short cellId) {
         MapTemplate map = client.getCharacter().getCurrentMap();
         if(map == null) return false;
         if(cellId == client.getCharacter().getCurrentCell()) return true;
-        return map.isValidActorCell(cellId, true);
+        return map.isValidActorCell(cellId, true, client.getCharacter().getId());
     }
 }

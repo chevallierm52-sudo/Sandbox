@@ -4,7 +4,6 @@ import org.apache.mina.core.session.IoSession;
 import org.dofus.constants.EConstants;
 import org.dofus.game.fight.Fight;
 import org.dofus.game.fight.Fighter;
-import org.dofus.network.game.GameClient;
 import org.dofus.objects.WorldData;
 import org.dofus.objects.actors.Characters;
 import org.dofus.objects.actors.EOrientation;
@@ -37,6 +36,9 @@ public class FightParser {
                 break;
             case 'D':
                 sendFightDetails(session, packet.substring(2));
+                break;
+            case 'V':
+                leaveSpectator(character, session);
                 break;
             case 'S':
                 session.write("BN");
@@ -152,6 +154,23 @@ public class FightParser {
         fight.removeFighter(character.getId());
         session.write("GV");
         session.write("GI");
+    }
+
+    public static boolean leaveSpectator(Characters character, IoSession session) {
+        Fight fight = getSpectatedFight(session);
+        if(fight == null) return false;
+
+        if(fight.removeSpectator(session)) {
+            session.write("GV");
+            logger.debug("Fight {} spectator left: {}", fight.getId(), character != null ? character.getName() : "?");
+            return true;
+        }
+        return false;
+    }
+
+    public static void removeSpectatorSession(IoSession session) {
+        Fight fight = getSpectatedFight(session);
+        if(fight != null) fight.removeSpectator(session);
     }
 
     public static void initiateFightVsMonsters(Characters character, IoSession session, int targetIdOrCell) {
@@ -335,6 +354,14 @@ public class FightParser {
         if(character == null) return null;
         for(Fight f : Fight.getActiveFights().values()) {
             if(f.getFighter(character.getId()) != null) return f;
+        }
+        return null;
+    }
+
+    public static Fight getSpectatedFight(IoSession session) {
+        if(session == null) return null;
+        for(Fight fight : Fight.getActiveFights().values()) {
+            if(fight.isSpectator(session)) return fight;
         }
         return null;
     }

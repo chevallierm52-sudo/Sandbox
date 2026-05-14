@@ -1,5 +1,16 @@
 # Changelog
 
+## [Phase 26 - Base combat PvM et corrections client 1.29] - 2026-05-14
+
+- `RolePlayMovement.java` : l'attaque d'un groupe de monstres se declenche maintenant apres l'arrivee du deplacement, avec un delai de 100 ms apres la cellule d'arret. Le chemin vers une cellule de monstre est tronque avant la cellule occupee.
+- `Fight.java` / `FightParser.java` : base PvM consolidee avec placement `GJK/GP`, pret `GR`, initiative, ordre `GTL`, etat `GTM`, timer `GTS/GTF`, deplacement PA/PM, sorts, morts, fin `GE`, drops/xp/kamas, spectateurs et reconnexion combat.
+- `Fight.java` : les sprites de combat sont envoyes en packets `GM|+...` separes, puis rafraichis apres 100 ms avec `GIC/GTM`, pour eviter l'ecran ou seuls les cercles rouge/bleu apparaissent.
+- `Fight.java` / `MonsterAI.java` : suppression des faux `GA;306` envoyes apres les degats. Le client 1.29 lit `306` comme un piege, ce qui provoquait des messages `undefined`; les PV/PA/PM sont maintenant synchronises par `GTM`.
+- `MonsterAI.java` : l'IA PvM joue son tour, temporise ses animations, synchronise l'etat et passe son tour proprement. Les taches differees de `Fight` n'accedent plus aux champs prives par accesseur synthetique fragile.
+- `FightParser.java` / `RolePlayHandler.java` : ajout de la sortie du mode spectateur via `GQ`/`fV`, avec envoi `GV` pour revenir sur la carte normale.
+- `Inventory.java` : encodage des accessoires visuels recale sur Ancestra (`arme,coiffe,cape,familier,bouclier`) afin que le bouclier utilise le bon layer client.
+- `MapTemplate.java` / `GameParser.java` : la validation de cellule ignore maintenant le personnage courant, ce qui evite le blocage de deplacement juste apres creation/connexion.
+
 ## [Phase 25 - Commande admin .align et fix zaapis] - 2026-05-13
 
 - `AdminParser.java` : commande `.align <nom> <type>` ajoutée. Fixe l'alignement d'un personnage connecté (0=neutre, 1=Bonta, 2=Brakmar), sauvegarde en BDD, envoie `ZS{type}` au client pour mettre à jour l'interface immédiatement. Le panel zaapis (`Wc`) s'ouvre correctement ensuite via skill 157. Investigation depuis `Subway.as` (sources StarLoco client) : `Wv` reçu = close panel (`Subway.onLeave`), `Wc{data}` = open panel (`Subway.onCreate`). La colonne `alignment` était déjà présente en BDD mais valait 0 (neutre) — le serveur renvoyait `Wv` correctement selon l'alignement.

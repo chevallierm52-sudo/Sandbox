@@ -100,12 +100,12 @@ public class Inventory {
      * Le client 1.29 ne lit pas ce champ comme les slots d'inventaire.
      * Dans CharactersManager.setSpriteAccessories/onAccessories, il fait un
      * split(",") puis commence volontairement a l'index 1. L'ordre des
-     * layers graphiques garde donc un decalage volontaire :
+     * layers graphiques suit le getGMStuffString Ancestra :
+     *   champ 0 = arme/outils, ignore par setSpriteAccessories
      *   index 1 = coiffe
      *   index 2 = cape
      *   index 3 = familier
-     *   index 4 = arme
-     *   index 5 = bouclier
+     *   index 4 = bouclier
      *
      * En roleplay 1.29, on garde le slot arme vide dans les accessoires GM/Oa.
      * L'objet reste equipe en inventaire, sauvegarde en BDD, et pourra servir
@@ -121,16 +121,16 @@ public class Inventory {
      */
     public String buildAccessories(boolean includeWeapon) {
         StringBuilder sb = new StringBuilder();
-        appendVisualAccessory(sb, 6, true);             // coiffe
-        appendVisualAccessory(sb, 7, true);             // cape
-        appendVisualAccessory(sb, 8, true);             // familier
-        appendVisualAccessory(sb, 1, includeWeapon);    // arme, masquee en RP
-        appendVisualAccessory(sb, 15, true);            // bouclier
+        appendVisualAccessory(sb, 1, includeWeapon, false); // arme/outils, slot ignore par le client
+        appendVisualAccessory(sb, 6, true, true);           // coiffe
+        appendVisualAccessory(sb, 7, true, true);           // cape
+        appendVisualAccessory(sb, 8, true, true);           // familier
+        appendVisualAccessory(sb, 15, true, true);          // bouclier
         return sb.toString();
     }
 
-    private void appendVisualAccessory(StringBuilder sb, int position, boolean visible) {
-        sb.append(',');
+    private void appendVisualAccessory(StringBuilder sb, int position, boolean visible, boolean separatorBefore) {
+        if(separatorBefore) sb.append(',');
         if(!visible) return;
 
         Item equipped = getEquipped(position);

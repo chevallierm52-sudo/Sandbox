@@ -97,6 +97,7 @@ public class Fighter {
 
     /** Applique des dégâts en tenant compte des résistances. Retourne les dégâts réels. */
     public int takeDamage(int raw, int element) {
+        int before = currentLife;
         int resist;
         switch(element) {
             case 0:  resist = resNeutral; break;
@@ -109,12 +110,13 @@ public class Fighter {
         // Résistance % — clamped 0-100
         int factor = Math.max(0, Math.min(100, resist));
         int damage = Math.max(1, raw - raw * factor / 100);
-        currentLife = (short) Math.max(0, currentLife - damage);
+        int dealt = Math.min(before, damage);
+        currentLife = (short) Math.max(0, before - dealt);
         if(currentLife <= 0) {
             dead = true;
             canPlay = false;
         }
-        return damage;
+        return dealt;
     }
 
     /** Soigne le fighter. Retourne le soin effectif appliqué. */

@@ -162,8 +162,8 @@ public class GameParser {
 	//FIXME BOT MOUVEMENT : c'es
 	public static void information(Characters character, IoSession session, GameClient client, MapTemplate map) {
 		MonstersData.spawnAll(map); //FIXME On spawn le groupe de monstre seulement map/map ça va pas... FAUT Chargé toute les maps concernant un groupe de monstre dessus, le reste des map on le garde en lazy-loading
-        if(!map.isValidActorCell(character.getCurrentCell())) {
-            Short safeCell = map.findNearestValidActorCell(character.getCurrentCell(), true);
+        if(!map.isValidActorCell(character.getCurrentCell(), true, character.getId())) {
+            Short safeCell = map.findNearestValidActorCell(character.getCurrentCell(), true, character.getId());
             if(safeCell != null) character.setCurrentCell(safeCell.shortValue());
         }
 		if(map.getActor(character.getId()) == null)

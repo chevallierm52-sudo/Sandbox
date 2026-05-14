@@ -146,6 +146,10 @@ public class MapTemplate {
     }
 
     public boolean isValidActorCell(short cellId, boolean allowTriggers) {
+        return isValidActorCell(cellId, allowTriggers, Integer.MIN_VALUE);
+    }
+
+    public boolean isValidActorCell(short cellId, boolean allowTriggers, int ignoredActorId) {
         if(!isValidCellId(cellId)) return false;
         if(!allowTriggers && triggers.containsKey(cellId)) return false;
         if(Formulas.isWaypointCell(id, cellId)) return false;
@@ -159,7 +163,7 @@ public class MapTemplate {
             // Le mode officiel priorise les donnees map decodees et interactive_objects_data.
             if(isInteractiveActionCell(cellId)) return false;
         }
-        return !isCellOccupied(cellId);
+        return !isCellOccupied(cellId, ignoredActorId);
     }
 
     public boolean hasBlockingInteractiveObject(short cellId) {
@@ -209,7 +213,12 @@ public class MapTemplate {
     }
 
     public boolean isCellOccupied(short cellId) {
+        return isCellOccupied(cellId, Integer.MIN_VALUE);
+    }
+
+    public boolean isCellOccupied(short cellId, int ignoredActorId) {
         for(Characters actor : actors.values()) {
+            if(actor != null && actor.getId() == ignoredActorId) continue;
             if(actor != null && actor.getCurrentCell() == cellId) return true;
         }
         for(NPC npc : npcs.values()) {
@@ -307,10 +316,14 @@ public class MapTemplate {
     }
 
     public Short findNearestValidActorCell(short origin, boolean allowTriggers) {
+        return findNearestValidActorCell(origin, allowTriggers, Integer.MIN_VALUE);
+    }
+
+    public Short findNearestValidActorCell(short origin, boolean allowTriggers, int ignoredActorId) {
         Short bestCell = null;
         int bestDistance = Integer.MAX_VALUE;
         for(short candidate = 0; candidate <= 559; candidate++) {
-            if(!isValidActorCell(candidate, allowTriggers)) continue;
+            if(!isValidActorCell(candidate, allowTriggers, ignoredActorId)) continue;
             int distance = MapCellDecoder.distance(origin, candidate);
             if(distance < bestDistance) {
                 bestDistance = distance;
