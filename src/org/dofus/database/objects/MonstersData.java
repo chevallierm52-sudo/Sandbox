@@ -184,9 +184,8 @@ public class MonstersData {
         int idx = 0;
         while(idx < pool.size()) {
             int remaining = pool.size() - idx;
-            int size = (remaining <= GROUP_SIZE_MIN)
-                    ? remaining
-                    : GROUP_SIZE_MIN + groupRng.nextInt(Math.min(GROUP_SIZE_MAX, remaining) - GROUP_SIZE_MIN + 1);
+            int maxSize = Math.min(GROUP_SIZE_MAX, remaining);
+            int size = pickGroupSize(maxSize, groupRng);
 
             short groupCell = pool.get(idx).cell;
             EOrientation groupOrient = pool.get(idx).orient;
@@ -219,6 +218,54 @@ public class MonstersData {
         }
 
         return count;
+    }
+
+    /**
+     * Distribution officielle AncestraR (MobGroup constructor) du nombre de mobs par groupe.
+     * Reproduit les probabilités exactes selon le maxSize de la zone.
+     */
+    private static int pickGroupSize(int maxSize, java.util.Random rng) {
+        if (maxSize <= 1) return 1;
+        int rand = rng.nextInt(100);
+        switch (maxSize) {
+            case 2: return rand < 50 ? 1 : 2;
+            case 3: return rand < 33 ? 1 : (rand < 66 ? 2 : 3);
+            case 4: // 22/26/26/26
+                if (rand < 22) return 1;
+                if (rand < 48) return 2;
+                if (rand < 74) return 3;
+                return 4;
+            case 5: // 15/20/25/25/15
+                if (rand < 15) return 1;
+                if (rand < 35) return 2;
+                if (rand < 60) return 3;
+                if (rand < 85) return 4;
+                return 5;
+            case 6: // 10/15/20/20/20/15
+                if (rand < 10) return 1;
+                if (rand < 25) return 2;
+                if (rand < 45) return 3;
+                if (rand < 65) return 4;
+                if (rand < 85) return 5;
+                return 6;
+            case 7: // 9/11/15/20/20/16/9
+                if (rand < 9) return 1;
+                if (rand < 20) return 2;
+                if (rand < 35) return 3;
+                if (rand < 55) return 4;
+                if (rand < 75) return 5;
+                if (rand < 91) return 6;
+                return 7;
+            default: // 8+ : 9/11/13/17/17/13/11/9
+                if (rand < 9) return 1;
+                if (rand < 20) return 2;
+                if (rand < 33) return 3;
+                if (rand < 50) return 4;
+                if (rand < 67) return 5;
+                if (rand < 80) return 6;
+                if (rand < 91) return 7;
+                return 8;
+        }
     }
 
     private static final class RawSpawnEntry {

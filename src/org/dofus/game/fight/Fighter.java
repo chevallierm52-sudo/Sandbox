@@ -19,7 +19,25 @@ import org.dofus.objects.actors.EOrientation;
  */
 public class Fighter {
 
-    public enum FighterType { PLAYER, BOT, MONSTER }
+    /**
+     * Types de combattant — alignés sur le switch {@code _type} de
+     * {@code Fighter.getGmPacket} AncestraR :
+     * <ul>
+     *   <li>{@code PLAYER(1)}    — case 1 (Perso)</li>
+     *   <li>{@code MONSTER(2)}   — case 2 (Mob)</li>
+     *   <li>{@code PERCEPTOR(5)} — case 5 (Perco / collecteur de guilde)</li>
+     *   <li>{@code BOT(99)}      — type custom Sandbox (PNJ-bot roleplay), pas en combat</li>
+     * </ul>
+     */
+    public enum FighterType {
+        PLAYER(1),
+        MONSTER(2),
+        PERCEPTOR(5),
+        BOT(99);
+
+        public final int id;
+        FighterType(int id) { this.id = id; }
+    }
 
     private final int         id;           // actorId du personnage ou groupId du monstre
     private final String      name;
@@ -28,7 +46,7 @@ public class Fighter {
 
     // Stats de combat
     private       short currentLife;
-    private final short maxLife;
+    private       short maxLife;
     private       int   currentAP;
     private final int   baseAP;
     private       int   currentMP;
@@ -51,10 +69,14 @@ public class Fighter {
 
     // Position
     private short        cell;
+    /** Cellule occupée par le joueur sur la map AVANT le début du combat (placement compris).
+     *  Sert à le replacer là où il était quand le fight se termine (vivant ou mort). */
+    private short        originalCell;
     private EOrientation orientation;
     private int          level = 1;
     private int          gfxId = 0;
     private int          templateId = 0;
+    private int          mobGrade = 0;
 
     // État
     private boolean dead         = false;
@@ -89,8 +111,9 @@ public class Fighter {
         this.resFire     = resFire;
         this.resWater    = resWater;
         this.resAir      = resAir;
-        this.cell        = cell;
-        this.orientation = orientation;
+        this.cell         = cell;
+        this.originalCell = cell;   // mémorisée pour la restauration post-fight
+        this.orientation  = orientation;
     }
 
     // ── Combat ────────────────────────────────────────────────────────────────
@@ -154,6 +177,7 @@ public class Fighter {
 
     public short getCurrentLife()  { return currentLife; }
     public short getMaxLife()      { return maxLife;     }
+    public void  setMaxLife(short maxLife) { this.maxLife = (short)Math.max(1, maxLife); }
     public int   getCurrentAP()   { return currentAP;  }
     public int   getBaseAP()      { return baseAP;     }
     public int   getCurrentMP()   { return currentMP;  }
@@ -175,6 +199,8 @@ public class Fighter {
 
     public short        getCell()        { return cell;        }
     public void         setCell(short c) { this.cell = c;      }
+    public short        getOriginalCell()        { return originalCell;     }
+    public void         setOriginalCell(short c) { this.originalCell = c;   }
     public EOrientation getOrientation() { return orientation; }
     public void         setOrientation(EOrientation o) { this.orientation = o; }
     public int          getLevel()       { return level;       }
@@ -185,6 +211,8 @@ public class Fighter {
         this.gfxId = Math.max(0, gfxId);
     }
     public void         setTemplateId(int templateId) { this.templateId = templateId; }
+    public int          getMobGrade()    { return mobGrade;     }
+    public void         setMobGrade(int mobGrade) { this.mobGrade = Math.max(0, mobGrade); }
 
     public boolean isDead()        { return dead;        }
     public boolean hasTurnPassed() { return turnPassed;  }

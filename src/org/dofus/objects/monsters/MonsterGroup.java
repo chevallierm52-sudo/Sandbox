@@ -60,6 +60,8 @@ public class MonsterGroup implements IActor {
 
     private final List<MonsterEntry> members = new ArrayList<>();
 
+    private final long creationTime = System.currentTimeMillis();
+
     // ── Constructeurs ─────────────────────────────────────────────────────────
 
     /** Constructeur principal (spawn depuis MonstersData). */
@@ -80,6 +82,16 @@ public class MonsterGroup implements IActor {
         this.groupId     = id;
         this.currentCell = cell;
         this.orientation = (orientation != null) ? orientation : EOrientation.SOUTH;
+    }
+
+    /**
+     * Bonus étoiles AncestraR : +1% par heure depuis la création du groupe, cap 200%.
+     * Influence drops et XP en fin de combat (cf. Formulas.getXpWinPvm2 + drops AncestraR).
+     */
+    public int getStarBonus() {
+        long elapsed = System.currentTimeMillis() - creationTime;
+        int percent = (int) Math.floor(elapsed / 3_600_000.0);
+        return Math.min(200, Math.max(0, percent));
     }
 
     // ── Membres ───────────────────────────────────────────────────────────────

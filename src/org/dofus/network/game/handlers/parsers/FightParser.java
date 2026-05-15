@@ -146,14 +146,26 @@ public class FightParser {
     private static void leaveFight(Characters character, IoSession session) {
         Fight fight = getFightForCharacter(character);
         if(fight == null) return;
-        if(fight.getState() != Fight.State.PLACEMENT) {
-            session.write("BN");
+
+        if(fight.getState() == Fight.State.PLACEMENT) {
+            // Abandon en phase placement : pas de panneau résultat (AncestraR n'en envoie pas
+            // non plus dans ce cas — pas de gain/perte tant que le combat n'a pas démarré).
+            // GV ferme la fenêtre combat, le joueur revient sur la map.
+            fight.removeFighter(character.getId());
+            session.write("GV");
             return;
         }
 
-        fight.removeFighter(character.getId());
-        session.write("GV");
-        session.write("GI");
+        if(fight.getState() == Fight.State.ACTIVE) {
+            // Abandon en combat actif : handleAbandon marque mort + déclenche endFight()
+            // si plus aucun fighter de team0 vivant → endFight broadcaste GE puis GV à tous.
+            // Le panneau résultat s'affiche côté client.
+            Fighter fighter = fight.getFighter(character.getId());
+            if(fighter != null) fight.handleAbandon(fighter);
+            return;
+        }
+
+        session.write("BN");
     }
 
     public static boolean leaveSpectator(Characters character, IoSession session) {
@@ -201,11 +213,15 @@ public class FightParser {
         Fighter playerFighter = buildPlayerFighter(character);
         fight.addFighter(playerFighter);
 
+        // Les fighter IDs mob doivent être NÉGATIFS pour que le client 1.29 les reconnaisse
+        // comme mobs (AncestraR Monstre.MobGroup utilise guid = -1, -2, -3...
+        // StarLoco Fight.java:200 idem via entry.getKey() qui est négatif descendant).
         int monsterIndex = 0;
+        int monsterFightId = -1;
         for(MonsterGroup.MonsterEntry entry : group.getMembers()) {
             MonsterTemplate.MonsterGrade grade = entry.getTemplate().getGrade(entry.getGrade());
             if(grade == null) continue;
-            Fighter monster = buildMonsterFighter(group, entry, grade, monsterIndex++);
+            Fighter monster = buildMonsterFighter(group, entry, grade, monsterIndex++, monsterFightId--);
             fight.addFighter(monster);
         }
 
@@ -241,14 +257,16 @@ public class FightParser {
                 character.getCurrentOrientation() != null ? character.getCurrentOrientation() : EOrientation.SOUTH);
         fighter.setInitiative(Statistic.totalWithEquipment(character, EConstants.ADD_INITIATIVE.getInt()) + life);
         fighter.setVisual(character.getExperience().getLevel(), character.getSkin());
+        fighter.setMaxLife((short)Math.max(1, character.getLifeMax()));
         return fighter;
     }
 
     private static Fighter buildMonsterFighter(MonsterGroup group, MonsterGroup.MonsterEntry entry,
-            MonsterTemplate.MonsterGrade grade, int index) {
-        int monsterId = 1_000_000 + group.getId() * 10 + index;
+            MonsterTemplate.MonsterGrade grade, int index, int fightId) {
+        // fightId est NÉGATIF (-1, -2, -3...) selon convention StarLoco/AncestraR.
+        // Le client Dofus 1.29 attend des IDs négatifs pour distinguer mob d'un joueur en combat.
         Fighter fighter = new Fighter(
-                monsterId,
+                fightId,
                 entry.getTemplate().getName(),
                 Fighter.FighterType.MONSTER,
                 1,
@@ -269,6 +287,7 @@ public class FightParser {
                 EOrientation.SOUTH);
         fighter.setVisual(grade.getLevel(), entry.getTemplate().getGfxId());
         fighter.setTemplateId(entry.getTemplate().getId());
+        fighter.setMobGrade(entry.getGrade());
         fighter.setInitiative(grade.getAgility() + grade.getWisdom() / 10 + grade.getLevel());
         fighter.setReady(true);
         return fighter;

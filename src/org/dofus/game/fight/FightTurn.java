@@ -32,6 +32,7 @@ public class FightTurn {
     private Fighter currentFighter;
     private ScheduledFuture<?> timeoutTask;
     private int turnNumber = 0;
+    private long turnStartMs = 0L;
 
     public FightTurn(Fight fight) {
         this.fight = fight;
@@ -41,6 +42,7 @@ public class FightTurn {
         cancelTimeout();
         this.currentFighter = fighter;
         this.turnNumber++;
+        this.turnStartMs = System.currentTimeMillis();
         fighter.resetTurn();
         fighter.setTurnPassed(false);
         fight.broadcast("GTS" + fighter.getId() + "|" + (TURN_DURATION_SEC * 1000));
@@ -52,12 +54,22 @@ public class FightTurn {
         }, TURN_DURATION_SEC, TimeUnit.SECONDS);
     }
 
+    public synchronized long getRemainingMs() {
+        if (turnStartMs == 0L) return TURN_DURATION_SEC * 1000L;
+        long elapsed = System.currentTimeMillis() - turnStartMs;
+        return Math.max(0L, TURN_DURATION_SEC * 1000L - elapsed);
+    }
+
     public synchronized void endTurn() {
         cancelTimeout();
         Fighter ended = currentFighter;
         if (ended != null) {
             ended.setTurnPassed(true);
+            // Séquence AncestraR : GTF (turn finish) → GTM (stats finales) → GTR (turn ready).
+            // GTR signale au client "fin de tour OK, tu peux fermer l'UI tour et attendre GTS".
             fight.broadcast("GTF" + ended.getId());
+            fight.broadcast(fight.buildTurnStatusPacket());
+            fight.broadcast("GTR" + ended.getId());
         }
         currentFighter = null;
         fight.nextTurn();

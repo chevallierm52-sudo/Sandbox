@@ -1,5 +1,404 @@
 # Changelog
 
+## [Phase 37 - Système de métiers complet + alignement packets combat sur AncestraR] - 2026-05-15
+
+**Gros pavé sur deux fronts** : implémentation complète du système de métiers (protocole officiel Dofus 1.29) et corrections en cascade des packets combat à partir de logs Ancestra capturés.
+
+### A. Système de métiers (protocole 1.29 officiel)
+
+Suppression du parser maison `M*` (`ML/MC/Mx/MK`) — un client 1.29.1 vanilla ne l'utilise jamais. Tout passe désormais par le vrai protocole.
+
+**Modèle & registre** :
+- `Job(id, name, canCraft, MAX_LEVEL=100)` — métier statique.
+- `JobProgress(jobId, level, xp)` — état perso, calcule `xpMin/xpMax` depuis `experiences_template.job`, `addXp(amount)` gère le levelup automatique en chaîne.
+- `JobsRegistry` — 16 métiers : Base (id 0, non-craft) + Alchimiste, Paysan, Bûcheron, Mineur, Pêcheur, Chasseur, Boulanger, Cordonnier, Bijoutier, Bricoleur, Sculpteur, Tailleur, Forgeron, Forgeur de boucliers, Sculpteur de bâtons.
+- `JobSkills` — table `skillId → jobId` (45/53/57/... = Paysan, 6/10/33/... = Bûcheron, 24/25/26/... = Mineur, etc.) + formule XP par récolte `max(1, respawnMs / 60_000)`.
+
+**Persistance** :
+- Table SQL `character_jobs(character_id, job_id, level, xp)` + PK composite + index sur owner. `sql/character_jobs.sql` à exécuter.
+- `CharacterJobsData` : `loadFor()`, `save()`, `saveAll()` (upsert batch), `delete()`. Le métier Base (id 0) n'est jamais persisté (toujours implicite).
+- `Characters.jobs` (LinkedHashMap) + `addJob()`/`knowsJob()`/`getJob()` ; load via `CharactersData.load`, save via `CharactersData.update` (batch automatique).
+
+**Packets officiels** :
+- `JS<jobId>;<canCraft>;<level>,<xp>,<xpMin>,<xpMax>;|...` — envoyé au login après `AS` (`RolePlayHandler` constructor) et après chaque apprentissage. Le métier Base apparaît toujours en tête avec le niveau du personnage.
+- `JX<jobId>~<xp>~<xpMin>~<xpMax>` — diffusé à chaque gain d'XP simple ; remplacé par un `JS` complet sur levelup (le client recompute le niveau de son côté).
+- `JN<jobId>` — notification d'apprentissage.
+
+**Apprentissage gratuit via PNJ** :
+- `NpcReply.Action.LEARN_JOB` ajouté à l'enum + `getJobIdToLearn()` (parse `params`).
+- `DialogParser.reply` route `LEARN_JOB` vers `JobParser.learn(character, session, jobId)` qui ajoute `JobProgress(jobId, 1, 0)`, persiste, envoie `JN` + `JS`. Insertion BDD type : `INSERT INTO npc_replies(id, text, action, params) VALUES (9001, 'Devenir Mineur', 'LEARN_JOB', '4');`
+
+**XP de récolte** :
+- Hook dans `InteractiveObjectService.grantReward(character, session, reward, skillId, respawnMs)` : si `JobSkills.jobIdFor(skillId) > 0` et le perso connaît le métier, on calcule `xp = xpForGather(respawnMs) × quantité` puis `JobParser.addXp()`.
+- Sans métier appris → ressource récoltée mais aucune XP gagnée (logique 1.29 : impossible de farmer un métier qu'on n'a pas appris).
+
+**Craft via protocole officiel `E*`** :
+- `CraftRecipesData` — extrait le chargement de recettes (`craft_recipes + craft_ingredients`) hors de l'ancien CraftParser, ajoute un index `byJob` et `findMatching(jobId, ingredients)` pour la validation côté serveur sur `EK1`.
+- `CraftSession(characterId, jobId, slotted)` — session serveur d'une fenêtre d'atelier ouverte. `ACTIVE` map statique (character_id → session, max une par perso). Les ingrédients sont **réservés** dans la grille sans modifier la BDD, consommés uniquement à la validation.
+- `CraftExchange` (nouveau parser) — handlers `Ec2|<jobId>` (ouverture), `EMG<uid>|<qty>` (Move Get = poser ingrédient), `EMD<uid>|<qty>` (Move Drop = retirer), `EK1` (Kommit = lancer le craft), `EV` (close). Vérifications : métier connu, niveau ≥ recette, ingrédients suffisants. Production : retire les ingrédients via `inv.removeItem` + `OR`/`OQ` packets, crée le résultat via `inv.addItem` + `OA` packet, XP via `JobParser.addXp` (`baseXp = level_requis × 5`, diminué par l'écart de niveau actuel).
+- `ExchangeParser.parse` dispatch `case 'c'` → `CraftExchange.open`, `case 'M'` → `move`, `case 'K'`/`'V'` → handlers qui choisissent entre `CraftExchange` et le trade J-J selon `CraftSession.isOpen(charId)`.
+
+**Commande admin** :
+- `.job <jobId> <level>` — apprend si nécessaire puis fixe le niveau (et l'XP au seuil correspondant). Pratique pour les tests : `.job 4 50` → Mineur niveau 50.
+
+**Fichiers supprimés** :
+- `CraftParser.java` (protocole `M*` maison). Imports/routes retirés de `RolePlayHandler` et `Initialisation`.
+
+### B. Combat : alignement complet sur les logs Ancestra
+
+L'utilisateur a fourni des logs serveur AncestraR-R d'un combat gagné + d'un combat abandonné. Diff ligne par ligne contre `packets.log` Sandbox a révélé une douzaine d'écarts qui expliquaient pratiquement tous les symptômes (sprites mob invisibles, animations qui ne jouent pas, sort bloqué après mouvement, panneau résultat invisible, désync PM/PA).
+
+**Format `GM` mob — case 2 d'AncestraR `Fighter.getGmPacket`** :
+- Format exact : `cell;1;0;id;templateId;-2;gfx^100;grade;c1;c2;c3;0,0,0,0;maxPdv;PA;PM;team`.
+- Sandbox envoyait depuis Phase 36 du `-3` (groupe roleplay) ou un `-2` mal formé. Restauré à l'identique de la référence : dir hardcodé à `1` (pas l'orientation réelle), champ 8 = grade index (1-5) et **pas** le level réel, pas de résistances séparées (juste maxPdv/PA/PM/team).
+- `Fighter.mobGrade` ajouté (champ + getter/setter) ; `FightParser.buildMonsterFighter` appelle `setMobGrade(entry.getGrade())`.
+
+**IDs mob négatifs** :
+- `FightParser.initiateFightVsMonsters` : `monsterFightId = -1; ... monsterFightId--` au lieu de l'ancien `1_000_000 + group.id × 10 + index` (positif → le client traitait l'acteur comme un joueur invisible).
+
+**Enum `FighterType` réaligné sur le switch `_type` AncestraR** :
+- `PLAYER(1)`, `MONSTER(2)`, `PERCEPTOR(5)`, `BOT(99)` — champ `id` explicite, plus de dépendance à `.ordinal()` dans le code de Fight (aucun appel `.ordinal()` n'existait). `PERCEPTOR(5)` ajouté en prévision des collecteurs de guilde (case 5 du `getGmPacket`).
+
+**Packets d'action — format AncestraR exact** :
+- `GA<gaId>;<type>;<actor>;<args>` uniquement pour l'action **principale** (`GA;1` mouvement, `GA;300` sort). `gaId` global incrémenté via `AtomicInteger Fight.GA_ID` + helpers `nextGaId()` / `nextGaPacketId()` (public).
+- `GA;<type>;<actor>;<args>` (SANS gaId) pour tous les **follow-up** : `GA;102` perte PA, `GA;129` perte PM, `GA;100` dégâts, `GA;108` soin, `GA;103` mort, `GA;303` melee. Cet écart filtrait des packets côté client.
+- Deltas en **négatif** pour les pertes (`,-N`), positif pour les gains (`,+N`). Le client fait `currentX += delta` et soustrait si négatif. (Mes essais antérieurs en positif sur les pertes désynchronisaient le HUD : « plus possible de bouger » alors qu'il restait des PM serveur.)
+- `GA;300` à **7 args** : `spellId,targetCell,spellSprite,spellLevel,X,Y,Z` (les 3 derniers : `0,0,1` neutres). Précédemment 4 args + un `,targetCell,-1,1` custom qui faisait ignorer le packet par le client → pas d'animation de sort.
+- `GA;103;<caster>;<target>` simple (mort). Suppression du `GA;402` custom qui n'existe pas chez AncestraR.
+
+**`GAS<actor>` — Game Action Start** :
+- Ajouté avant chaque `GA;1` (move) et `GA;300` (spell) pour les joueurs ET pour les mobs. Sans `GAS`, le client 1.29.1 ne passe pas en mode animation et téléporte le sprite à la destination au lieu de jouer le walk cycle. AncestraR commente *« les monstres n'ont pas de GAS/GAF »* mais l'expérimentation sur Sandbox montre que le client _exige_ `GAS<mob>` — donc on l'envoie pour move et melee mob via `MonsterAI`.
+
+**`GAF<type>|<actor>` — Game Action Finished** :
+- Marqueur constant par type d'action (constantes `GAF_SPELL=0`, `GAF_MELEE=1`, `GAF_MOVE=2`). Envoyé après chaque action joueur pour signaler au client que le traitement serveur est terminé → le client peut alors envoyer son `GKK<type>` et passer à la suite. Sans GAF, le client restait bloqué en attendant la confirmation, refusait les sorts suivants.
+
+**`GTR<actor>` — Game Turn Ready** :
+- Ajouté dans `FightTurn.endTurn()` : séquence finale du tour devient `GTF` → `GTM` → `GTR`. Sans GTR le client ne fermait pas l'UI de tour côté HUD.
+
+**Pas de `GIC` après mouvement** :
+- `Fight.handleMove` et `Fight.sendMovementEnd` n'appellent plus `syncFightState()`. Le GIC envoyé pendant l'animation TPait le sprite à la destination et cassait le walk cycle. Le GTM final arrive plus tard via `endTurn`.
+
+**Délai d'animation calé sur le client** :
+- Mesure dans le packets.log : intervalle `GA;1` → `GKK1` du client = ~650-1300ms par case. Sandbox utilisait 300ms/case ce qui faisait arriver le GA;129/GIC pendant l'animation.
+- `Fight.handleMove` : `animMs = Math.max(900L, steps * 700L)`.
+- `MonsterAI` : `MOVE_STEP_DURATION_MS = 700L`, `MOVE_END_PADDING_MS = 500L`, `ATTACK_ANIMATION_MS = 900L`, `SPELL_ANIMATION_MS = 700L`.
+
+**Cellule d'origine mémorisée** :
+- `Fighter.originalCell` initialisé à la création du Fighter (cellule roleplay avant placement combat), pas modifié par `setCell()`. `restorePlayersAfterFight` utilise `f.getOriginalCell()` au lieu de `f.getCell()` pour ramener le joueur à sa case roleplay (gagnant ou mort) — sans ça il réapparaissait sur une case de placement parfois hors zone visible.
+
+**Refonte `GE` (panneau résultat) alignée sur `Fight.GetGE` AncestraR** :
+- Header : `GE<time>;<starBonus>|<initiator>|<type>|...` avec `time` calculé depuis `startedAt` (nouveau champ initialisé dans `startActive`, _pas_ depuis `createdAt` qui inclurait le placement) et `type = 0` (CHALLENGE) en PvM — pas `4` comme avant.
+- Winners triés par prospection desc (cohérent avec la distribution drops). Mobs gagnants désormais inclus dans la liste (auparavant filtrés → le client refusait d'afficher un panneau avec une équipe vide).
+- Entrée winner : 13 champs `2;guid;name;level;dead;min;cur;max;winXp;guildXp;mountXp;drops;kamas` — `guildXp`/`mountXp` laissés vides (TODO), valeurs nulles → `""` (convention AncestraR).
+- Entrée loser : 12 champs `0;guid;name;level;dead;min;cur;max;;;;` (4 vides trailing).
+- Trailing `|` conservé (Ancestra) — le retirer faisait sauter la dernière entrée côté client.
+
+**Plus de `GV` après `GE`** :
+- Sandbox envoyait `broadcast("GE..."); broadcast("GV")` — le `GV` fermait l'UI combat _immédiatement_, le panneau résultat n'avait pas le temps de s'afficher. Vérifié dans les logs Ancestra : **`GV` n'est jamais envoyé** après un combat actif. Sandbox aligné : `GE` → `fC0` → `restorePlayersAfterFight()` → `ILS1000` (signal de unlock, le client peut alors fermer le panneau quand l'utilisateur clique).
+- `FightParser.leaveFight` (abandon) : suppression du `session.write("GI")` parasite (GI est un packet client→serveur, le renvoyer pollue le flux).
+
+**Why** : les bugs combat depuis Phase 28 (sprites invisibles, anim manquantes, sort bloqué, panneau résultat absent, désync PM/HUD) viennent **tous** d'écarts mineurs accumulés sur les packets exacts envoyés à un client 1.29.1 vanilla. Les logs Ancestra capturés en parallèle d'un combat équivalent ont servi d'oracle ligne par ligne pour corriger.
+
+### Correctifs supplémentaires fin de phase (après nouveaux logs)
+
+Comparaison d'un 2e log Sandbox post-fixes avec les logs Ancestra a révélé 2 derniers écarts critiques.
+
+**Retour en arrière sur `GAS<mob>`** :
+- L'ajout précédent de `GAS<mobId>` dans `MonsterAI` (move + melee) **cassait** l'animation au lieu de la fixer. AncestraR commente explicitement *« les monstres n'ont pas de GAS/GAF »* et n'envoie aucun `GAS` pour les acteurs négatifs.
+- Hypothèse : le client 1.29.1 reçoit `GAS<actorNégatif>` et passe en état d'attente d'un GKK qui ne viendra jamais (pas de client mob), bloquant ainsi toute la chaîne d'animation.
+- Code retiré : plus de `fight.broadcast("GAS" + monster.getId())` dans `executeMoveThenMaybeAttack` ni `executeMeleeThenEnd`. Le `GAS` reste pour les joueurs uniquement (logique).
+
+**Réorganisation handleSpell — ordre Ancestra exact + suppression du délai** :
+- Ancestra envoie tous les packets d'un sort **d'affilée** sans délai côté serveur : `GAS → GA;300 → GA;100 (dégâts) → GA;103 (mort éventuelle) → GA;102 (perte PA) → GAF0`. Le client met les animations en queue côté UI et les enchaîne lui-même.
+- Sandbox utilisait un `FightTurn.schedule(..., 700ms)` entre `GA;300` et `GA;100` : les dégâts apparaissaient au milieu de l'animation du sort, brisant l'affichage visuel. Le `GA;102` (perte PA) était aussi envoyé **avant** les dégâts au lieu d'après.
+- Suppression du `schedule` : `applyEffect()` est appelé en ligne juste après `GA;300`, puis `GA;102`, puis `GAF0`. Le `checkWinCondition()` reste à la fin pour déclencher `endFight()` si applicable.
+
+**`directionChar` mob reverse-engineered depuis les paths joueur** :
+- Le mapping initial `delta +14 → 'f'` était faux (la mauvaise direction visuelle iso), puis mon premier fix `delta +14 → 'b'` aussi faux. Le mob continuait à ne pas s'animer car le client refusait probablement de jouer une marche dans la direction inverse du mouvement réel.
+- Analyse empirique des paths du joueur dans le log (le client envoie ses propres dir chars cohérents avec sa logique iso) :
+  - `adihcS` : delta -28 = 2 × -14 avec dir `h` → **delta -14 = `h`** (NORD-EST visuel)
+  - `acSddibdx` : step1 delta +28 = 2 × +14 avec dir `d` → **delta +14 = `d`** (SUD-OUEST visuel)
+  - `beedes` : step1 delta +45 = 3 × +15 avec dir `b` → **delta +15 = `b`** (SUD-EST visuel)
+- En iso Dofus, +1 (même row, col+1) et +14 (next row, même col) sont visuellement la **même** direction (DOWN-LEFT), d'où le même char `d` pour les deux deltas. Idem pour -1 et -14 → `h`.
+- Table corrigée appliquée à [MonsterAI.directionChar](src/org/dofus/game/fight/MonsterAI.java:188).
+
+**Orientation mise à jour après mouvement** :
+- Ajout d'un champ `Fighter.originalCell` ← déjà fait dans la passe précédente ; nouveau : mise à jour de `Fighter.orientation` à la fin du mouvement avec la direction du dernier step (via `EOrientation.valueOf(HASH.indexOf(lastDirChar))`). Sans ça le sprite gardait son orientation de placement initial tour après tour.
+- `Fight.handleMove` : décode le 3e dernier char de `effectivePath` (dir du dernier step) → met à jour l'orientation du joueur.
+- `MonsterAI.MonsterMove` : nouveau champ `finalDirChar` calculé dans `buildMoveToward`. `executeMoveThenMaybeAttack` met à jour l'orientation du mob via ce champ.
+
+**Restore map view différé jusqu'au GC1 client (panneau résultat propre)** :
+- L'utilisateur voyait "les cellules des joueurs présents sur la map" pendant l'affichage du panneau résultat, parce que `restorePlayersAfterFight` envoyait IMMÉDIATEMENT à la fin du combat un `GM` complet de la map (tous les acteurs + groupes mob) au joueur — qui apparaissait en transparence derrière le panneau.
+- Comportement Ancestra exact (vérifié dans les logs) : après le `GE` + `fC0` + `ILS1000`, le serveur **n'envoie plus rien** au joueur jusqu'à ce qu'il clique Fermer (envoie `GKK0`) puis `GC1` (game creation), qui déclenche le map reload via `GameParser.creation`.
+- Refactor [Fight.restorePlayersAfterFight](src/org/dofus/game/fight/Fight.java:691) : restauration serveur-side uniquement (cell roleplay, life, `map.addActor`, broadcast `GM|+player` aux AUTRES acteurs de la map). Le map view au joueur lui-même est laissé à la prochaine `GameParser.creation` quand le client envoie `GC1` après avoir fermé le panneau.
+
+**Reste à faire** :
+- `GKK<gaId>` acknowledgment côté serveur (au lieu de delays fixes) pour un timing parfait — discuté avec l'utilisateur, repoussé à plus tard.
+- `OAKO<uidBase36>~<tpl>~<qty>~~;` format Ancestra pour ajouter les drops à l'inventaire (notre `OAKO*O;<entry>` est custom et peut ne pas afficher les items dans le panneau résultat).
+- `As<stats>` refresh stats avant le `GE` (Ancestra l'envoie après les OAKO drops, avant le panneau).
+- Téléportation post-mort vers map phénix (au lieu de remise sur la cellule d'origine).
+- Investigation du « chapeau qui disparaît après combat » — soupçon de bug d'affichage de `buildAccessories` dans le GM post-fight, à confirmer avec un log post-combat complet (les logs reçus s'arrêtent au tour 5).
+- Drops vides dans le panneau résultat : `DropTable.loadDefaults()` ne couvre que 3 templates (Tofu, Larve Blanche, Bouftou-id-5). Les templates Bouftou variants (489, 491) et autres mobs n'ont aucun drop chargé. À compléter avec une table SQL `monster_drops` ou enrichir les defaults.
+
+
+
+**Cause racine enfin trouvée**. Utilisateur a soufflé l'hypothèse correcte : « il y a un actorID spécial fight pour les monstres ».
+
+**Vérification dans StarLoco** (`Fight.java:200`) :
+```java
+for (Entry<Integer, MonsterGrade> entry : group1.getMobs().entrySet()) {
+    Fighter mob = Fighter.NewMob(entry.getKey(), this, entry.getValue());
+    //                            ^^^^^^^^^^^^^^^^
+    //                            entry.getKey() est NÉGATIF (-1, -2, -3...)
+    //                            car _Mobs.put(guid--, mob) descend depuis -1
+}
+```
+
+**Vérification dans AncestraR** (`Monstre.java:174`) :
+```java
+int guid = -1;
+for (int a = 0; a < nbr; a++) {
+    ...
+    _Mobs.put(guid, Mob);
+    guid--;  // -1, -2, -3, ...
+}
+```
+
+Le client Dofus 1.29 utilise le **signe de l'actorId** pour distinguer player (positif) de mob (négatif). Sandbox utilisait `1_000_000 + group.id × 10 + index` = 3000000+ (positif et grand) → le client tente d'afficher comme un player → pas de sprite trouvé → invisible.
+
+**Fix** :
+- `FightParser.initiateFightVsMonsters` génère un `monsterFightId = -1` puis décrémente (`-1, -2, -3...`) à chaque mob ajouté au combat.
+- `FightParser.buildMonsterFighter` accepte maintenant le `fightId` négatif en paramètre au lieu de le calculer en interne.
+
+**Retour au format StarLoco officiel** :
+- Maintenant que les IDs sont corrects, on remet le format `-2` pour les mobs combat (Phase 35 utilisait `-3` en rustine, c'était l'ID négatif le vrai bug).
+- Format mob restauré : `cell;dir;0;NEGATIVE_ID;templateId;-2;gfx^100;grade;col1;col2;col3;0,0,0,0;maxPdv;PA;PM;team` (16 champs StarLoco)
+- Format player restauré : `cell;dir;0;id;name;classe;gfx^size;sex;level;0,0,0,levelPlusId;col1;col2;col3;accessories;currentPdv;PA;PM;resN;resE;resF;resW;resA;dodgePA;dodgePM;team` (26 champs StarLoco)
+
+**Orientation hardcoded "1"** (StarLoco convention) :
+- `Fight.appendGMEntry` : `fighter.getOrientation().ordinal()` remplacé par `"1"` hardcoded pour player ET mob, comme `PlayerFighter.getGmPacket` ligne 859 + `MobFighter.getGmPacket`.
+- Évite que le perso garde son orientation roleplay (ex: NORTH_EAST=7) bizarre face à la team adverse.
+
+**Why :** retour utilisateur « prend une décision radicale copie starloco », screenshot montrant cases placement OK mais aucun sprite mob visible. L'hypothèse actorID négatif était la bonne. C'est le bug racine depuis Phase 26.
+
+## [Phase 35 - Format GM combat aligné sur format roleplay Sandbox] - 2026-05-14
+
+**Cause racine identifiée** : le client custom Sandbox utilise une logique de parsing GM qui ne distingue PAS roleplay et combat. Il attend le **même format** dans les deux modes. Les formats StarLoco/AncestraR officiels (avec stats fight dans le GM) ne sont pas compris par ce client.
+
+**Fix** :
+- **Player combat** : `Fight.appendGMEntry` réécrit pour copier exactement `GProtocol.getCharacterPattern` (format roleplay qui marche, sprites + couleurs OK). Stats fight (PV/PA/PM/team) ne sont plus dans le GM — transmises uniquement via `GTM` envoyé juste après.
+  - Format : `cell;dir;0;id;name;breed;skin^size;sex;align,100,alignLvl,0,dishonor;col1Hex;col2Hex;col3Hex;accessories;classFlag;;;;0;;`
+  - Faction `0,100,0,0,0` Sandbox (au lieu du `0,0,0,levelPlusId` StarLoco testé Phase 30).
+  - Pas de `level` après sex (StarLoco) — pas de level dans format roleplay Sandbox.
+- **Mob combat** : aligné sur format roleplay groupe AncestraR `MonsterGroup.toGMEntry` (qui MARCHE en RP). On simule un « groupe d'un seul mob » avec marker `-3` au lieu de `-2`.
+  - Format : `cell;dir;0;id;templateId;-3;gfx^100;level;-1;-1;-1;0,0,0,0;`
+  - Stats fight (PV/PA/PM/team) transmises via GTM.
+  - Champ 8 = `level` absolu (cohérent avec `MonsterGroup.toGMEntry` ligne 168 `grade.getLevel()`), pas le numéro de grade Phase 32.
+
+**Pourquoi cette approche** :
+- En roleplay : sprites visibles, couleurs OK. → Format A fonctionne.
+- En combat (Phase 30-34) : sprites invisibles, couleurs fausses. → Format B (StarLoco/AncestraR officiel) ne marche pas.
+- Conclusion : le client utilise format A pour tout. On bascule format combat sur format A.
+
+**Test attendu** : sprites mobs visibles à l'entrée combat, couleurs player correctes, barres PV/PA/PM affichées correctement via GTM.
+
+**Why :** retour utilisateur "le sprite des monstres au moment du combat ne fonctionne toujours pas". Lecture du log packets.log Phase 34 confirme que les paquets sont bien envoyés mais le client ne parse pas le format `-2` officiel. Bascule sur format `-3` roleplay-compatible.
+
+## [Phase 34 - Formule XP officielle, starBonus, taille groupe AncestraR, minProsp/max] - 2026-05-14
+
+Implémentation des formules officielles AncestraR pour XP, kamas, distribution taille groupe et drops avec `minProsp`/`max`. Lecture directe de `Formulas.getXpWinPvm2` (ligne 523), `Formulas.getKamasWin` (ligne 663), `MobGroup` constructeur (ligne 32) et `Fight.java:2743-2980`.
+
+**1. Formule XP officielle `Formulas.getXpWinPvm2`** (`Fight.calculateAndApplyRewards`) :
+```
+xpWin = groupXP × rapport1 × bonus × coef × rapport2 × (1 + starBonus/100)
+```
+Avec :
+- `coef = (sage + 100) / 100` (bonus sagesse du joueur)
+- `rapport1 = max(1.3, 1 + lvlLoosers / lvlWinners)` (rapport challenge équipe perdante / gagnante)
+- `rapport2 = 1 + winnerLevel / lvlWinnersSum` (part proportionnelle au level individuel)
+- `bonus` selon `nbBonus` (winners dont level > lvlmax/3) : 1→1.0, 2→1.1, 3→1.3, 4→2.2, 5→2.5, 6→2.8, 7→3.1, 8+→3.5
+- `starBonus` = bonus étoiles du groupe (cf. point 3)
+
+**2. Formule kamas officielle `Formulas.getKamasWin`** : chaque joueur reçoit son propre roll `rand(min, max)` (pas de partage entre joueurs). Avant, on divisait le total entre les winners — moins généreux que l'officiel.
+
+**3. `MonsterGroup.getStarBonus()`** : nouveau. Calcule `floor(elapsedMs / 3_600_000)`, cap à 200. Bonus de +1% par heure depuis la création du groupe (système officiel Dofus 1.29 qui récompense les groupes anciens). Appliqué aux drops ET à l'XP.
+
+**4. Distribution officielle taille groupe** (`MonstersData.pickGroupSize`) : remplace le random uniforme `2..5` par les probabilités exactes AncestraR `MobGroup` constructor. Table pour maxSize 1-8 :
+| maxSize | Distribution |
+|---------|-------------|
+| 2 | 50/50 |
+| 3 | 33/33/33 |
+| 4 | 22/26/26/26 |
+| 5 | 15/20/25/25/15 |
+| 6 | 10/15/20/20/20/15 |
+| 7 | 9/11/15/20/20/16/9 |
+| 8+ | 9/11/13/17/17/13/11/9 |
+
+**5. `DropTable.DropEntry.minProsp` et `max`** : nouveaux champs.
+- `minProsp` : PP minimum requise pour que le drop soit éligible (default 0 = toujours éligible).
+- `max` : nombre max d'occurences avant épuisement (default `Integer.MAX_VALUE` = infini). Décrémenté à chaque obtention, drop retiré du pool global quand `max <= 0`.
+
+**6. Filtre + boost effectifs** (`Fight.calculateAndApplyRewards`) :
+- `effectivePP = groupPP × (100 + starBonus) / 100` (boost étoiles avant filtrage).
+- Drop ignoré si `drop.minProsp > effectivePP`.
+- Sinon, taux boosté `boostedRate = drop.rate × effectivePP / 100`.
+
+**Why :** retour utilisateur "execute les patch (pour l'experience une formule est déjà presente dans l'ému il me semble utilise celle la)" — formule trouvée `Formulas.getXpWinPvm2` AncestraR ligne 523, implémentée à l'identique.
+
+**Reste à faire (Phase 35+) :**
+- Attente `GKK1` réelle au lieu de délai fixe pour animations IA (complexe : nécessite système de callbacks par action en cours).
+- Persister `minProsp`/`max` depuis la BDD (actuellement les drops chargés via `loadDefaults` n'utilisent que rate/qty).
+- Bonus challenges (XP+drop) si on implémente le système de challenges plus tard.
+
+## [Phase 33 - Drop officiel AncestraR : tri PP, cycle, maxItemsPerPerso] - 2026-05-14
+
+Réécriture de `Fight.calculateAndApplyRewards` pour suivre l'algorithme officiel AncestraR (`Fight.java:2743-2980`) + StarLoco.
+
+**Avant** : tous les drops étaient attribués au premier joueur de l'équipe (`winners.get(0)`), XP et kamas divisés à l'égale entre tous les joueurs.
+
+**Maintenant** (5 étapes alignées sur AncestraR) :
+
+1. **PP de groupe agrégée** : somme des prospections (équipement + chance/10) de tous les winners. Clampée min 100.
+2. **Pool `possibleDrops`** : pour chaque mob mort, on copie ses drops dans le pool avec le `rate` boosté par `groupPP / 100` (jusqu'à `MAX_RATE = 10000`). Source via nouveau `DropTable.getDrops(monsterId)` qui expose la liste brute (sans roll).
+3. **Tri winners par PP descendant** : le joueur avec le plus de PP loot en premier.
+4. **Distribution cyclique** : `maxItemsPerPerso = floor(possibleDrops.size() / nbWinners)` (au moins 1). Pour chaque winner dans l'ordre PP DESC : shuffle du pool, roll 1d10000 contre chaque drop, max `maxItemsPerPerso` items. Les drops obtenus sont **retirés du pool global** → joueurs suivants ont moins de choix (= équité officielle).
+5. **XP et kamas** :
+   - XP proportionnelle au level : `xpShare = totalXp × winnerLevel / totalTeamLevel`. Joueurs bas level reçoivent moins (en valeur absolue) mais c'est plus juste car ils gagnent un level plus vite.
+   - Kamas : roll global `[minKamasTotaux, maxKamasTotaux]` boosté par PP, puis partage proportionnel à la PP individuelle de chaque winner.
+
+**Nouvelle méthode `DropTable.getDrops(monsterTemplateId)`** : retourne la liste brute des drops (pas roll) d'un monstre. Permet à `Fight` de construire le pool global avant distribution.
+
+**Pas implémenté (TODO Phase 34+)** :
+- `minProsp` par drop : actuellement DropEntry n'a pas ce champ (AncestraR refuse certains drops si groupPP < minProsp). Notre code accepte tous les drops, donc plus permissif.
+- `max` par drop (nombre d'occurences total possible avant épuisement) : on retire le drop dès qu'il tombe une fois, équivalent à `max = 1`.
+- Bonus challenges + starBonus du groupe (timer depuis la création du groupe). Notre `MonsterGroup` n'a pas `starBonus`.
+
+**Why :** retour utilisateur — "lister les drops par monstres dans le combat et répartir de façon officiel chercher sur internet le fonctionnement du drop et l'implémenter". Lecture directe du code AncestraR `Fight.java:2743-2980` (algorithme officiel Dofus 1.29) extrait depuis `ressources/émulateur pour support/`.
+
+**Rapport complet** : `RAPPORT_MONSTRES_STARLOCO.md` — analyse comparée 7 sections (spawn, respawn, clic groupe, sprites, animations, drops/XP, priorités).
+
+## [Phase 32 - Mob sprite : champ 8 = grade number, pas level absolu] - 2026-05-14
+
+Analyse du log `logs/packets.log` Phase 31 — vérifie que le format `GM|+` mob suit bien StarLoco (16 champs). Découvert un bug subtil :
+
+**Le champ 8 du GM mob doit être le numéro de grade (1-5), pas le level absolu (3-7)**.
+
+- StarLoco `MobFighter.getGMPacketParts()` : `String.valueOf(mobGrade.getGrade())` — c'est `getGrade()`, le numéro 1-5.
+- AncestraR `Fight.java:443` : `str.append(_mob.getGrade())` — pareil.
+- Sandbox Phase 30 envoyait `fighter.getLevel()` qui est le level absolu via `setVisual(grade.getLevel(), ...)` — un Bouftou royal grade 5 envoyait `25` ou `30` au lieu de `5`.
+- Conséquence : le client Dofus 1.29 attend grade ∈ [1,5] et refuse d'afficher le sprite si valeur > 5 → mobs invisibles.
+
+**Fix** :
+- `Fighter.java` : nouveau champ `mobGrade` avec getter/setter (n'utilise plus `level` pour deux choses différentes).
+- `FightParser.buildMonsterFighter` : `fighter.setMobGrade(entry.getGrade())` ajouté.
+- `Fight.appendGMEntry` (mob) : utilise `fighter.getMobGrade()` au lieu de `fighter.getLevel()` pour le champ 8. Fallback à `1` si non set.
+
+**Vérification via PacketLogger** : ligne 62 du log Phase 31 montrait `+353;2;0;3000000;31;-2;1563^100;3;-1;-1;-1;0,0,0,0;15;4;2;1`. Avant Phase 32, le `3` au champ 8 était le `grade.getLevel()` du mob de level 3 (donc par chance ça matchait pour un grade 1). Pour les mobs de level > 5, ça envoyait des valeurs invalides.
+
+## [Phase 31 - PacketLogger persiste sur disque (logs/packets.log)] - 2026-05-14
+
+- `PacketLogger.java` réécrit : en plus de l'affichage `System.out.println` existant, écrit chaque ligne dans `logs/packets.log` (fichier texte brut, 1 ligne par paquet, format identique à la console).
+- **Au démarrage** : si `logs/packets.log` existe déjà (run précédent), il est archivé en `logs/packets-YYYYMMDD-HHmmss.log` avant la création d'un nouveau fichier. Le run en cours est donc TOUJOURS dans `logs/packets.log`.
+- **À la fermeture** : shutdown hook (`Runtime.getRuntime().addShutdownHook`) qui flush + close le fichier proprement. Marqueur `# PacketLog end <timestamp>` ajouté en dernière ligne.
+- **En cours d'exécution** : chaque `recv()`/`sent()` fait un `flush()` immédiat → aucune ligne perdue même si le serveur crash SIGKILL.
+- Synchronisation via `Object FILE_LOCK` autour de l'écriture (les filters MINA peuvent appeler depuis plusieurs threads I/O).
+- Aucun changement dans `Game.java` ni `Server.java` — les appels existants `PacketLogger.recv/sent` fonctionnent toujours, juste persistés en plus.
+
+**Why :** demande utilisateur — pouvoir relire tout l'échange réseau d'une session pour debug, et permettre à un assistant externe (Claude) de lire le log via un chemin fixe sans avoir à demander un copier-coller à chaque fois.
+
+**Comment lire** : ouvrir `C:/Users/cheva/eclipse-workspace/Sandbox/logs/packets.log`. Ou `tail -f logs/packets.log` en live. Ou demander à Claude de faire un `Read` sur ce chemin.
+
+**Note `.gitignore`** : `*.log` était déjà ignoré, donc rien ne sera commité par accident.
+
+## [Phase 30 - Combat format StarLoco officiel, délai animation, maxLife] - 2026-05-14
+
+Recherche dans `ressources/émulateur pour support/StarLoco-Game-master.zip` (`PlayerFighter.getGMPacketParts` ligne 97 et `MobFighter.getGMPacketParts` ligne 63) pour aligner le format `GM` combat sur la référence officielle Dofus 1.29.
+
+**Format `GM|+` combat aligné sur StarLoco** :
+- **Player** : `cell;dir;0;id;name;classe;gfx^size;sex;level;align,0,0,levelPlusId;col1;col2;col3;accessories;currentPdv;baseAP;baseMP;resN;resE;resF;resW;resA;dodgePA;dodgePM;team` (26 champs). Le `level + id` dans factionParts est le bizarre StarLoco officiel (commenté `// WTF ?` dans la source). Le `level` est bien ENTRE sex et factionParts (mon hotfix Phase 28 qui le retirait était une fausse piste).
+- **Mob** : `cell;dir;0;id;templateId;-2;gfx^size;grade;col1;col2;col3;0,0,0,0;maxPdv;PA;PM;team` (17 champs). Pas de resists/dodge pour les mobs (format StarLoco MobFighter). C'était la cause des mobs invisibles : on envoyait 25 champs au lieu de 17.
+
+**Fix `Fighter.maxLife` (régression maxLife=currentLife)** :
+- `Fighter.maxLife` n'est plus `final`. Ajout d'un setter `setMaxLife(short)`. Le constructeur initialise `maxLife = life` (vie courante au moment de l'entrée combat) mais c'est buggé quand le joueur entre avec vie réduite (par exemple 1 PV après mort précédente). `FightParser.buildPlayerFighter` appelle maintenant `fighter.setMaxLife(character.getLifeMax())` pour fixer la vraie max.
+
+**Délai animation déplacement (perso « TP »)** :
+- `Fight.handleMove` : `GA1;1` envoyé immédiatement (le client commence l'animation), mais `GA;129` (perte PM) + `GIC` (position) + `GTM` (timeline) sont retardés via `FightTurn.schedule` de `Math.max(400, steps × 300)` ms. Avant, `GIC` immédiat après `GA1;1` téléportait le sprite à la nouvelle cellule sans animer le chemin intermédiaire.
+- Le callback vérifie `fight.state != FINISHED` et que le fighter existe encore.
+
+**Format `GE` fin combat amélioré** :
+- Pour player (canLoot=true) : ajout de `defaultGfx` (skin) après `level` selon format StarLoco PvM winner. Champs vides remplacés par chaîne vide au lieu de `0` (xpGuild, xpMount). Format : `<result>;<id>;<name>;<level>;<skin>;<dead>;<minXp>;<curXp>;<maxXp>;<gainXp>;;;<drops>;<kamas>`.
+- Pour mob : `<result>;<id>;<templateId>;<level>;<dead>;0;0;0;;;;;` (pas de skin).
+
+**Why :** retour utilisateur Phase 29 :
+1. « Pas les bonnes couleurs du perso » → format align mauvais (`0,100,0,0,0` au lieu de `0,0,0,levelPlusId` StarLoco).
+2. « Mobs invisibles » → format mob avait des champs en trop (resists/dodge) que le client ne sait pas parser.
+3. « Anime pas, le perso TP » → GA1;1 et GIC dans la même ms, le client n'a pas le temps d'animer.
+4. « Fenêtre fin combat buggée » → format GE incomplet, manque `defaultGfx`.
+5. « Mort en combat = perso invisible » → probablement lié au maxLife=1 si vie courante était 1, et au refresh sprite après combat. Partiellement adressé par le fix maxLife.
+
+**Reste à faire :** vérifier en jeu, puis si toujours problèmes, comparer paquet par paquet avec StarLoco (j'ai maintenant accès aux sources `tmp/starloco/` extraites).
+
+## [Phase 29 - Combat hotfix 2 : format GM combat, calcul PM, double GV] - 2026-05-14
+
+Hotfix après analyse log combat fourni par l'utilisateur (Phase 28 → sprites toujours invisibles + déplacement illimité + panneau résultat buggé).
+
+**Bug A — Calcul `steps` faux dans `handleMove` (PM jamais consommés)** :
+- Le format path Dofus 1.29 est `(dir + cell) × N` = 3 chars par step. Pour `GA001ddH` (3 chars), c'est **1 step**, pas 0.
+- Ancien calcul `(length / 2) - 1` donnait 0 pour 3 chars → pas de `GA;129` envoyé → compteur PM client jamais décrémenté → joueur peut se déplacer "illimité".
+- Nouveau : `int steps = pathStr.length() / 3`. Validation min length passée de 2 à 3 chars.
+
+**Bug B — Format `GM` combat insère `level` après `sex` (sprite invisible)** :
+- Comparaison avec `GProtocol.getCharacterPattern` (format roleplay qui marche, sprites visibles) :
+  - Roleplay : `cell;dir;0;id;name;breed;skin^size;sex;ALIGNMENT;col1;col2;col3;accessories;...`
+  - Combat (avant) : `cell;dir;0;id;name;breed;skin^size;sex;**LEVEL**;ALIGNMENT;col1;col2;col3;accessories;...`
+- Le client parsait `70` (level) comme alignment → tous les champs suivants décalés (skin/couleurs/accessoires) → sprite invisible.
+- Fix : retiré le champ `level` du `appendGMEntry` player. Ajouté `maxLife` après `currentLife` pour le client puisse afficher la barre de vie correctement.
+- Mob : ajouté aussi `maxLife` après `currentLife` pour cohérence du format.
+
+**Bug C — Double `GV` en abandon (panneau résultat buggué)** :
+- `FightParser.leaveFight` envoyait `session.write("GV")` après `handleAbandon`. Mais `handleAbandon` → `endFight` envoie déjà `broadcast("GV")`. Résultat : 2 `GV` consécutifs → client traite le 1er (sortie + panneau résultat), puis le 2e invalide le panneau.
+- Fix : retiré le `session.write("GV")` dans `leaveFight` après `handleAbandon`. Garde uniquement `session.write("GI")` pour rafraîchir la map après le panneau.
+
+**Why :** analyse fine du log combat fourni montrant :
+1. `GA001ddH` (3 chars) → serveur envoie `GA1;1` mais pas de `GA;129` → PM client toujours plein.
+2. `GM|+213;5;0;...;1;70;0,100,...` → le `70` mal placé décale le parsing client.
+3. `GV` × 2 puis `GI` → panneau combat ferme/réouvre/glitche.
+
+**Reste à faire :** vérifier en jeu que ces 3 fixes débloquent enfin les sprites + PM corrects + panneau de résultat propre. Ensuite ré-implémenter tacle/portée Phase 30 avec coordonnées isométriques correctes (utiliser `map.getWidth()`).
+
+## [Phase 28 - Combat hotfix : sprites GM concaténé, tacle/portée désactivés, abandon] - 2026-05-14
+
+Hotfix après retours utilisateur Phase 27 : sprites toujours invisibles, joueur impossible à déplacer, sorts impossibles à lancer, abandon non fonctionnel.
+
+- `Fight.sendFightSprites(session)` et `Fight.broadcastFightSprites()` : envoient maintenant un SEUL paquet `GM|+fighter1|+fighter2|+fighterN` concaténé (format roleplay standard 1.29), au lieu de N paquets `GM|+xxx` séparés. Méthode `buildAllSpritesGMPacket()` ajoutée. C'était la cause principale des sprites invisibles : le client 1.29 attend tous les acteurs dans un seul `GM`, pas un par paquet.
+- `Fight.handleMove()` : retiré le check tacle (Phase 27 patch 9). Le calcul d'adjacence avec `diff == 1 || diff == 14` ne matche pas la grille isométrique Dofus, ce qui pouvait bloquer le joueur même quand aucun ennemi n'était réellement adjacent. À réimplémenter Phase 29+ avec coordonnées (x,y) isométriques correctes.
+- `Fight.handleSpell()` : retiré le check portée + ligne (Phase 27 patch 8). Pour la même raison : `manhattanDistance` avec `MAP_GRID_WIDTH=14` constante ne correspond pas à la vraie largeur isométrique. Garde uniquement la validation `map.isValidCellId(targetCell)` et le coût PA. À réimplémenter avec `map.getWidth()` + grille isométrique correcte.
+- `Fight.handleAbandon(fighter)` : nouvelle méthode publique pour gérer l'abandon en combat actif. Marque le fighter mort via `takeDamage(99999, 0)`, broadcast `GA;103` + `GA;402`, fin de tour si current, puis check de victoire.
+- `FightParser.leaveFight()` : ne renvoie plus `BN` quand fight ACTIVE. Si placement → retire le fighter et restore map (Phase 27). Si actif → appelle `fight.handleAbandon(fighter)` pour mort propre + `GV` + `GI`. C'était la cause de l'« impossible d'abandonner le combat ».
+- Helpers `adjacentEnemies`, `tackleEscapeChance`, `manhattanDistance`, `isInStraightLine`, `MAP_GRID_WIDTH` conservés dans le code mais inutilisés pour l'instant (réutilisés Phase 29+ après fix grille isométrique).
+
+**Why :** la Phase 27 a introduit deux régressions (tacle + portée) basées sur une grille rectangulaire alors que Dofus 1.29 utilise une grille isométrique. Les sprites invisibles étaient un bug Phase 26 (GM individuel) qui n'avait pas été identifié. Cette phase corrige les 3.
+
+**Reste à faire :** ré-implémenter portée et tacle avec coordonnées isométriques (`(x = cell % mapWidth, y = (cell - x) / mapWidth)` mais sur grille en losange Dofus avec offset alterné selon parité de row).
+
+## [Phase 27 - Combat patches manquants : GDK placement, GV fin, tacle, portée, restore] - 2026-05-14
+
+Compléments à la base Phase 26 — appliqués directement sur main après audit du log de combat fourni.
+
+- `Fight.startPlacement()` : `broadcast("GDK")` après `GM`/`GIC`. Sans ce signal de fin de chargement, le client 1.29 ne finalisait pas l'affichage des sprites au lancement du combat. Le `scheduleFightSpritesRefresh` à +100 ms reste comme filet de sécurité.
+- `Fight.endFight()` : `broadcast("GV")` après le packet de résultat `GE`. Sans ce signal de sortie, le client restait dans l'état combat et le panneau de résultat (XP/kamas/drops) ne se finalisait pas correctement.
+- `Fight.removeFighter()` : si le fighter retiré est un joueur, `map.addActor(chr)` est appelé pour le replacer sur la map roleplay. Avant, `leaveFight` envoyait `GV`+`GI` au client mais le `Characters` n'était jamais réattaché à la map roleplay — les autres joueurs ne le voyaient plus revenir.
+- `Fight.cancelFight()` : restaure le `MonsterGroup` sur la map via `map.addMonsterGroup(group)` + broadcast `GM|+<entry>` aux acteurs roleplay. Avant, si l'initiateur quittait en placement PvM, le groupe restait disparu jusqu'au prochain respawn — perte définitive pour les autres joueurs. Code dédié ne réutilise pas `restorePlayersAfterFight()` qui écraserait la cellule RP avec la cellule de placement combat.
+- `Fight.broadcastOnMap(packet, except)` : nouvelle méthode privée pour diffuser un paquet aux acteurs encore sur la map roleplay (équivalent à la version dans `FightParser`).
+- `Fight.handleSpell()` : portée min/max et `isLineOnly()` vérifiés AVANT de consommer les PA. `manhattanDistance(a, b)` et `isInStraightLine(a, b)` ajoutés (helpers utilisant `MAP_GRID_WIDTH = 14`). Refus immédiat si `targetCell` hors map. Avant, un joueur pouvait lancer n'importe quel sort sur n'importe quelle cellule et l'AP était consommé même si la cible était invalide.
+- `Fight.handleMove()` : tacle 1.27 simplifié — si départ adjacent à au moins un ennemi vivant, roll d'esquive `(agiFlee + 25) / (agiFlee + agiTotal + 50)` clampé [0.10, 0.90]. Sur échec, mouvement annulé, perte de `currentMP × (1 - escape)` PM et `currentAP × (1 - escape) / 2` PA. `GA;102` et `GA;129` broadcastés pour notifier la perte. Helpers `adjacentEnemies(ref, cell)` et `tackleEscapeChance(fleeing, taclers)` ajoutés.
+- `FightTurn` : champ `turnStartMs` initialisé dans `startTurn()`, méthode `getRemainingMs()` qui calcule `TURN_DURATION_SEC*1000 - elapsed`. Avant, un joueur reconnecté recevait toujours un `GTS` avec 30 000 ms même si le tour était déjà avancé.
+- `Fight.reconnect()` et `Fight.addSpectator()` : envoient maintenant `GTS<id>|<remainingMs>` (au lieu de `TURN_DURATION_SEC*1000` plein).
+
+**Why :** patches faits dans un git worktree (branche `claude/agitated-gould-34babd`) puis ré-appliqués sur main car Eclipse compile main, pas le worktree — d'où l'observation utilisateur « Clean & Build et toujours buggué ». Les changements main du commit `ab62e7b6 "Fight"` couvraient ~30 % des patches prévus ; cette phase 27 ajoute le reste.
+
+**Reste à faire (Phase 28+) :** ligne de vue réelle avec raycast et obstacles, cooldown/maxPerTurn/maxPerTarget des sorts, CC/EC, états (Pesanteur, Stabilisé), zones de sort (croix/cercle/ligne), invocations, packet `GA;5` explicite pour signaler le tacle au client.
+
 ## [Phase 26 - Base combat PvM et corrections client 1.29] - 2026-05-14
 
 - `RolePlayMovement.java` : l'attaque d'un groupe de monstres se declenche maintenant apres l'arrivee du deplacement, avec un delai de 100 ms apres la cellule d'arret. Le chemin vers une cellule de monstre est tronque avant la cellule occupee.

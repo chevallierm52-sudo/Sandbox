@@ -1,0 +1,569 @@
+================================================================================
+TESTS COMBAT SANDBOX — Phases 26 à 28
+================================================================================
+Date document : 2026-05-14
+Couvre : Patch 1 (couche actions), Patch 2 (GDK), Patch 3 (reconnect timer),
+         Patch 4 (IA délais), Patch 5 (éléments), Patch 6 (restore groupe),
+         Patch 7 (sortie placement), Patch 8 (portée sort), Patch 9 (tacle).
+
+PRÉ-REQUIS AVANT TOUT TEST
+--------------------------------------------------------------------------------
+1. Eclipse → Project → Clean → sélectionner le projet Sandbox → OK.
+2. Vérifier qu'il n'y a aucune erreur de compilation rouge.
+3. Relancer le serveur (org.dofus.Main).
+4. Garder la console serveur visible pour lire les logs [SENT]/[RECV] et [FIGHT].
+
+Chaque test précise :
+  - ÉTAPES = ce qu'il faut faire dans le client
+  - ATTENDU = comportement correct attendu
+  - LOG = paquet à voir côté serveur pour valider
+  - ÉCHEC = signe que le patch n'a pas marché
+
+
+================================================================================
+TEST 1 — LANCEMENT PvM + SPRITES VISIBLES (Patch 1 + 2)
+================================================================================
+ÉTAPES
+  1. Se connecter avec un personnage niveau >= 1.
+  2. Aller sur une map avec un groupe de monstres (ex: 7430, 7412).
+  3. Cliquer sur le groupe → laisser le déplacement roleplay se terminer.
+
+ATTENDU
+  - Animation roleplay finie → écran combat charge.
+  - Cases de placement (ronds rouges côté joueurs, bleus côté mobs) VISIBLES.
+  - Sprites des joueurs et des mobs VISIBLES dans des cellules différentes.
+  - Bouton "prêt" disponible.
+
+LOG (ordre canonique)
+  RECV GKK1
+  SENT GM|-<groupId>
+  SENT GJK2|0|1|0|30000|4          ← type 4 PvM
+  SENT GP<places0>|<places1>|0
+  SENT GM|+<player>
+  SENT GM|+<mob1> ... GM|+<mobN>
+  SENT GIC|<player>;<cell>|<mob>;<cell>|...
+  SENT GDK                          ← NOUVEAU patch 2
+  [FIGHT 1] placement started: ... vs group ... on map ...
+
+ÉCHEC
+  - Pas de GDK envoyé → sprites invisibles → patch 2 non appliqué.
+  - Type GJK différent de 4 → patch 1 FIGHT_TYPE_PVM pas pris en compte.
+
+
+================================================================================
+TEST 2 — CHANGER DE CASE EN PLACEMENT
+================================================================================
+ÉTAPES
+  1. En placement (test 1), cliquer sur une autre case rouge de ton équipe.
+
+ATTENDU
+  - Le sprite du joueur se déplace immédiatement sur la nouvelle case.
+
+LOG
+  RECV Gp<cell>
+  SENT GIC|<player>;<newCell>
+
+ÉCHEC
+  - Sprite ne bouge pas ou erreur GICe envoyée → cellule refusée.
+
+
+================================================================================
+TEST 3 — DÉMARRAGE DU COMBAT (GR1)
+================================================================================
+ÉTAPES
+  1. En placement, cliquer sur le bouton prêt.
+
+ATTENDU
+  - Le combat démarre, première timeline visible en haut de l'écran.
+  - Ton tour commence (timer 30 s en haut).
+  - Les PA et PM affichés correctement.
+
+LOG
+  RECV GR1
+  SENT GR1<playerId>
+  SENT GS
+  SENT GTL|<id1>|<id2>|...           ← ordre initiative
+  SENT GTM|<id>;0;<life>;<AP>;<MP>;<cell>;;<maxLife>|...
+  SENT GTS<currentId>|30000
+
+ÉCHEC
+  - GTM absent → patch 1 non appliqué, le client ne sait pas l'état des fighters.
+  - GTS sans GTM précédent → ordre canonique cassé.
+
+
+================================================================================
+TEST 4 — MOUVEMENT JOUEUR + PERTE PM (Patch 1)
+================================================================================
+ÉTAPES
+  1. À ton tour, cliquer sur une case à 2 ou 3 cases de toi.
+
+ATTENDU
+  - Le sprite marche jusqu'à la case cible (animation).
+  - Le compteur PM en haut descend de N (= nombre de cases).
+  - La vie reste identique.
+
+LOG
+  RECV GA001<path>
+  SENT GA1;1;<playerId>;<path>
+  SENT GA;129;<playerId>;<playerId>,-<steps>     ← perte PM
+  SENT GIC|<player>;<newCell>|...                 ← position mise à jour
+  SENT GTM|<player>;0;<life>;<AP>;<newMP>;<newCell>;;<maxLife>|...
+
+ÉCHEC
+  - Pas de GA;129 → patch 1 non appliqué, le compteur PM reste à 6.
+  - Pas de GTM → la timeline ne se met pas à jour, vie/PA/PM faux.
+
+
+================================================================================
+TEST 5 — LANCER UN SORT DIRECT (Patch 1 + 5)
+================================================================================
+ÉTAPES
+  1. À ton tour, sélectionner un sort de dégâts dans la barre.
+  2. Cliquer sur un mob à portée.
+
+ATTENDU
+  - Le sort se lance avec animation.
+  - PA consommés (compteur baisse).
+  - Vie du mob baisse (barre rouge réduite).
+  - Si le mob meurt : son sprite disparait ou passe en grisé.
+
+LOG
+  RECV GA300<spellId>;<targetCell>
+  SENT GA1;300;<player>;<spellId>,<targetCell>,<spriteId>,<level>,<targetCell>,-1,1
+  SENT GA;102;<player>;<player>,-<apCost>       ← perte PA
+  SENT GA;100;<player>;<targetId>,-<damage>     ← dégâts
+  SENT GA;103;<player>;<targetId>                ← si mort
+  SENT GA;402;<player>;<targetId>;0              ← si mort
+  SENT GIC|...|GTM|...
+
+ÉCHEC
+  - GA;102 absent → PA pas consommés visuellement.
+  - GA;100 avec ";dmg" au lieu de ",-dmg" → format ancien, patch 1 non appliqué.
+
+
+================================================================================
+TEST 6 — PORTÉE DE SORT (Patch 8)
+================================================================================
+ÉTAPES
+  1. À ton tour, sélectionner un sort à portée limitée (ex: portée 1-5).
+  2. Essayer de le lancer sur une cellule à 6+ cases (hors portée).
+
+ATTENDU
+  - Aucune action serveur (rien ne se passe).
+  - PA NON consommés (compteur inchangé).
+
+LOG
+  RECV GA300<spellId>;<targetCell>
+  (rien envoyé en retour)
+
+ÉCHEC
+  - Sort lancé quand même → patch 8 portée non appliqué.
+  - PA consommés sans effet → spendAP avant validation, bug.
+
+VARIANTE
+  - Pour un sort lineOnly : tester sur cible hors ligne (diagonale par exemple).
+    Attendu : refus silencieux serveur.
+
+
+================================================================================
+TEST 7 — TACLE 1.27 (Patch 9)
+================================================================================
+ÉTAPES
+  1. Avoir au moins un ennemi vivant adjacent à toi (1 case voisine).
+  2. Essayer de te déplacer plus loin (cliquer une case à 3+ cases).
+  3. Répéter 5-10 fois pour observer le RNG.
+
+ATTENDU
+  - Parfois : mouvement normal (esquive réussie).
+  - Parfois : mouvement annulé, perte de PA et PM visible.
+  - La proportion dépend de l'agilité (en early game ~50-70% esquive).
+
+LOG (tacle réussi côté ennemi = échec esquive)
+  RECV GA001<path>
+  SENT GA;102;<player>;<player>,-<lostAP>
+  SENT GA;129;<player>;<player>,-<lostMP>
+  SENT GIC|...|GTM|...
+  [FIGHT N] tackle: fighter=<id> escape=0.45 lostAP=1 lostMP=2
+
+ÉCHEC
+  - Mouvement toujours autorisé → tacle non détecté.
+  - Log "tackle" jamais visible → patch 9 non compilé.
+
+
+================================================================================
+TEST 8 — TOUR DES MONSTRES AVEC DÉLAIS (Patch 4)
+================================================================================
+ÉTAPES
+  1. Passer ton tour rapidement (bouton Gt ou attendre).
+  2. Observer les mobs jouer un par un.
+
+ATTENDU
+  - Chaque mob attend ~600 ms après GTS avant de bouger.
+  - L'animation de déplacement se voit ENTIÈREMENT avant que les PM descendent.
+  - Entre la fin du tour d'un mob et le début du suivant : ~300 ms perceptibles.
+  - Aucun mob ne "se téléporte" ni "court sur place".
+
+LOG (timestamps importants)
+  SENT GTS<mob1>|30000
+  (≥ 600 ms)
+  SENT GA1;1;<mob1>;<path>
+  (≥ steps × 300 + 400 ms = ~700-1300 ms)
+  SENT GA;129;<mob1>;<mob1>,-<steps>
+  SENT GA;100;<mob1>;<player>,-<damage>   ← si attaque
+  (≥ 800 ms)
+  SENT GTF<mob1>
+  (≥ 300 ms)
+  SENT GTS<mob2>|30000
+
+ÉCHEC
+  - GA1;1 et GA;129 dans la même milliseconde → délai animation pas appliqué.
+  - GTF et GTS suivant dans la même ms → délai endTurn pas appliqué.
+  - Patch 4 non compilé.
+
+
+================================================================================
+TEST 9 — DÉCO/RECO PENDANT COMBAT ACTIF (Patch 2 + 3)
+================================================================================
+ÉTAPES
+  1. Lancer un combat, jouer 1-2 tours.
+  2. Attendre que ce soit le tour d'un mob (timer du mob en cours).
+  3. Fermer le client brutalement (Alt+F4 ou kill task).
+  4. Reconnecter le même compte (même perso).
+
+ATTENDU
+  - Le client recharge directement dans le combat (pas écran noir, pas map old).
+  - Sprites de tous les fighters visibles aux bonnes cellules.
+  - Timeline visible avec ordre correct.
+  - Le timer du mob courant affiche le TEMPS RESTANT (pas 30 000 ms plein).
+  - À ton prochain tour, le timer est de nouveau 30 000 ms.
+
+LOG (séquence reconnect)
+  RECV GI
+  SENT GJK2|...|4                         ← spectator=0, fight ACTIVE
+  SENT GP<places>...
+  SENT GM|+<all fighters>
+  SENT GIC|<all positions>
+  SENT GDK                                ← patch 2
+  SENT GS
+  SENT GTL|...
+  SENT GTM|...                            ← état complet (vies actuelles)
+  SENT GTS<currentMob>|<remainingMs>      ← patch 3 : temps RESTANT
+
+ÉCHEC
+  - GDK absent → écran noir ou sprites invisibles.
+  - GTS avec 30000 alors que tour entamé → patch 3 non appliqué.
+  - GTM absent → barres de vie remises à max (incorrect).
+
+
+================================================================================
+TEST 10 — DÉCO/RECO PENDANT PLACEMENT
+================================================================================
+ÉTAPES
+  1. Lancer un combat, rester en placement (pas appuyer prêt).
+  2. Fermer le client. Reconnecter immédiatement.
+
+ATTENDU
+  - Reconnect direct dans le placement.
+  - Cases rouges/bleues visibles, sprites visibles.
+  - Possibilité de cliquer prêt.
+
+LOG
+  RECV GI
+  SENT GJK2|...|1|...   ← placement=1
+  SENT GP<places>...
+  SENT GM|+...
+  SENT GIC|...
+  SENT GDK
+
+ÉCHEC
+  - GJK avec placement=0 → confusion état placement/actif.
+
+
+================================================================================
+TEST 11 — VICTOIRE + TABLEAU DE FIN AVEC XP/KAMAS/DROPS (Patch 1)
+================================================================================
+ÉTAPES
+  1. Combattre jusqu'à tuer TOUS les mobs.
+  2. Observer le panneau de fin de combat.
+
+ATTENDU
+  - Panneau de résultat s'affiche automatiquement.
+  - XP gagnée visible (valeur > 0 si mobs avaient XP).
+  - Kamas gagnés visibles (valeur > 0).
+  - Drops listés (si chance roll réussi) : nom_item × quantité.
+  - Après fermeture du panneau, retour automatique sur la map roleplay.
+  - Le groupe monstre ne réapparait PAS immédiatement (respawn scheduled).
+
+LOG
+  SENT GA;100;<player>;<lastMob>,-<damage>
+  SENT GA;103;<player>;<lastMob>
+  SENT GA;402;<player>;<lastMob>;0
+  SENT GA;102;<player>;<player>,-<apCost>
+  SENT GIC|...|GTM|...|<lastMob>;1     ← mob marqué dead
+  SENT As<xpStuff>...                    ← stats mises à jour
+  SENT Of+<kamas>                        ← kamas gagnés
+  SENT GE<duration>|<senderId>|4|<result entries>
+  SENT GV                                ← NOUVEAU patch 1 (signal sortie)
+  [FIGHT N] ended winnerTeam=0 xp=X kamas=Y drops=Z
+
+ÉCHEC
+  - GV absent → client reste bloqué en combat, panneau pas finalisé.
+  - GE absent → pas de panneau du tout.
+  - XP/kamas à 0 dans le panneau alors qu'il y a des mobs morts → bug rewards.
+  - GE avec |0| au lieu de |4| → FIGHT_TYPE_PVM pas mis à 4.
+
+
+================================================================================
+TEST 12 — DÉFAITE (TOUS LES JOUEURS MORTS)
+================================================================================
+ÉTAPES
+  1. Laisser les mobs te tuer (ne pas attaquer, juste passer tes tours).
+
+ATTENDU
+  - Panneau de fin s'affiche avec résultat perdu.
+  - Aucune XP/kamas/drop gagnés.
+  - Retour automatique sur la map roleplay (pas téléport au phoenix car pas implémenté).
+  - Vie remise à 1 (Math.max(1, currentLife)).
+
+LOG
+  SENT GE<duration>|<senderId>|4|0;<player>;...   ← resultType=0 (perdant)
+  SENT GV
+
+ÉCHEC
+  - Reste bloqué dans le combat → endFight pas déclenché.
+
+
+================================================================================
+TEST 13 — QUITTER EN PLACEMENT, GROUPE RESTAURÉ (Patch 6 + 7)
+================================================================================
+ÉTAPES
+  1. Lancer un combat sur une map avec UN groupe de monstres visible.
+  2. Rester en placement, cliquer sur "quitter le combat" (bouton croix ou /quit).
+  3. Observer la map roleplay.
+
+ATTENDU
+  - Retour immédiat sur la map.
+  - Le groupe de monstres EST DE NOUVEAU VISIBLE sur la map (pas disparu).
+  - Le sprite du joueur revient sur la cellule roleplay d'avant le combat.
+
+LOG
+  RECV GKK                                ← leaveFight
+  SENT GM|-<player>                       ← retire du combat
+  SENT GV                                 ← sortie
+  SENT GI                                 ← reload map
+  SENT GM|+<group entry>                  ← NOUVEAU patch 6 : groupe restauré
+  [FIGHT N] canceled during placement, group=<id> restored=true
+
+ÉCHEC
+  - Groupe pas restauré → patch 6 non appliqué, perte définitive du groupe.
+  - Joueur reste invisible aux autres → patch 7 (map.addActor) non appliqué.
+
+
+================================================================================
+TEST 14 — VOL DE VIE (Patch 5)
+================================================================================
+ÉTAPES
+  1. Avoir un sort à effet 96-100 (vol de vie élémentaire).
+     Sorts Dofus 1.29 typiques : Mot de Frayeur (Eni), Chance d'Eca dans certains cas.
+  2. Être à vie réduite (pas full life).
+  3. Lancer le sort sur un mob.
+
+ATTENDU
+  - Dégâts infligés au mob.
+  - La moitié des dégâts soigne le caster (animation soin visible).
+  - Vie du caster augmente.
+
+LOG
+  SENT GA;100;<player>;<mob>,-<damage>
+  SENT GA;108;<player>;<player>,<healed>   ← soin (= damage/2)
+
+ÉCHEC
+  - Pas de GA;108 → patch 5 vol de vie pas réintégré.
+  - Si pas de sort vol de vie disponible : skip test.
+
+
+================================================================================
+TEST 15 — DÉGÂTS ÉLÉMENTAIRES CORRECTS (Patch 5)
+================================================================================
+ÉTAPES
+  1. Trouver un mob avec résistances asymétriques (ex: forte rés feu, faible rés eau).
+     Voir mob.getFire() vs mob.getWater() dans MonsterTemplate.
+  2. Noter sa vie max.
+  3. Lancer un sort feu (effet 94/99) sur le mob → noter dégâts.
+  4. Recharger une session identique, lancer un sort eau (effet 91/96) → noter dégâts.
+
+ATTENDU
+  - Le sort sur élément faible (eau ici) fait PLUS de dégâts que le sort sur élément résisté (feu).
+  - Avant le patch : c'était l'inverse (mapping water/fire inversé).
+
+LOG
+  SENT GA;100;<caster>;<mob>,-<damage>   ← compare entre les deux essais
+
+ÉCHEC
+  - Sort feu fait plus que sort eau alors que le mob résiste plus au feu → mapping non corrigé.
+
+
+================================================================================
+TEST 16 — SPECTATEUR (Patch 2)
+================================================================================
+ÉTAPES
+  1. Avec un 1er compte : lancer un combat sur une map.
+  2. Avec un 2ème compte (différent) : se connecter et aller sur la même map.
+
+ATTENDU
+  - Le 2ème compte voit un drapeau/épée de combat sur la map (paquet fL).
+  - Cliquer sur le drapeau → option "rejoindre comme spectateur".
+  - Rejoindre → écran combat charge, sprites visibles, timeline visible.
+  - Aucune possibilité d'agir.
+
+LOG (côté 2ème compte)
+  SENT fL|<entries>
+  RECV (clic spectator)
+  SENT GJK2|0|0|1|...|4    ← spectator=1
+  SENT GP...
+  SENT GM|+all fighters
+  SENT GIC|...
+  SENT GDK                  ← patch 2
+  SENT GS|GTL|GTM|GTS<currentId>|<remainingMs>
+
+ÉCHEC
+  - Sprites invisibles côté spectateur → GDK manquant dans addSpectator.
+  - Spectateur peut jouer une action → check à faire serveur (à patcher si bug).
+
+
+================================================================================
+TEST 17 — COMBAT QUI FINIT PENDANT QU'UN MOB EST EN COURS D'ANIM (Patch 4)
+================================================================================
+ÉTAPES
+  1. Avoir 1 seul mob vivant restant à très faible vie.
+  2. Le tuer.
+  3. C'était son tour ? Sinon attendre que ce soit le tour d'un autre mob mort.
+
+ATTENDU
+  - Pas de NPE serveur.
+  - Pas de "tour suivant" tenté sur un mob mort.
+  - Le combat passe à endFight normalement.
+
+LOG
+  Aucune exception dans la console serveur.
+
+ÉCHEC
+  - NullPointerException → canStillPlay() pas correctement implémenté.
+  - "Cannot invoke ... because turn.getCurrentFighter() is null" → manque le check.
+
+
+================================================================================
+TEST 18 — ENCHAÎNEMENT DE PLUSIEURS COMBATS
+================================================================================
+ÉTAPES
+  1. Faire un combat complet (victoire).
+  2. Attaquer un nouveau groupe immédiatement.
+  3. Répéter 3-4 fois.
+
+ATTENDU
+  - Chaque combat démarre proprement.
+  - Aucune fuite mémoire ni état zombie (player.fight devrait être null entre combats).
+  - Les drops s'accumulent dans l'inventaire.
+  - L'XP cumule correctement.
+
+LOG
+  Chaque combat doit avoir un fight ID croissant : [FIGHT 1], [FIGHT 2], ...
+  Aucun warning "already in fight" ou similaire.
+
+ÉCHEC
+  - "BN" envoyé au 2e clic → getFightForCharacter pas null → état non nettoyé.
+
+
+================================================================================
+TEST 19 — TACLE QUAND ON QUITTE UNE CASE NON ADJACENTE
+================================================================================
+ÉTAPES
+  1. Être à 2+ cases d'un ennemi (pas adjacent).
+  2. Se déplacer.
+
+ATTENDU
+  - Aucun tacle (mouvement direct).
+  - PM consommés normalement.
+
+LOG
+  Pas de log "[FIGHT N] tackle:".
+
+ÉCHEC
+  - Tacle déclenché alors que pas adjacent → bug logique adjacentEnemies.
+
+
+================================================================================
+TEST 20 — DÉCO PENDANT TON PROPRE TOUR
+================================================================================
+ÉTAPES
+  1. À ton tour, ne rien faire, fermer le client brutalement.
+
+ATTENDU
+  - Le tour passe au mob suivant après quelques secondes (timeout 30 s).
+  - Au reconnect, tu n'es PLUS le current fighter.
+  - Le combat continue sans toi (tu es marqué disconnected).
+
+LOG
+  Au déconnect :
+    SENT GA;950;<player>;<player>,1   ← état disconnected
+    (tour passe au suivant si c'était ton tour)
+  Au reconnect (si combat encore actif) :
+    SENT GA;950;<player>;<player>,0   ← état reconnecté
+
+ÉCHEC
+  - Pas de GA;950 → patch 3 format pas corrigé.
+  - Combat bloqué sur ton tour 30 s → handleDisconnect pas appelé.
+
+
+================================================================================
+RÉSUMÉ : MATRICE TEST × PATCH
+================================================================================
+                   P1 P2 P3 P4 P5 P6 P7 P8 P9
+  Test 1 lance     X  X
+  Test 2 place
+  Test 3 démarre   X
+  Test 4 mvmt jr   X
+  Test 5 sort      X        X
+  Test 6 portée                       X
+  Test 7 tacle                            X
+  Test 8 IA délais       X
+  Test 9 reco act     X  X
+  Test 10 reco plc    X  X
+  Test 11 victoire X
+  Test 12 défaite  X
+  Test 13 quit plc                X  X
+  Test 14 vol vie           X
+  Test 15 éléments          X
+  Test 16 spect       X
+  Test 17 end async    X
+  Test 18 chain
+  Test 19 no tacle                        X
+  Test 20 deco tr     X  X
+
+
+================================================================================
+ORDRE CONSEILLÉ DE LANCEMENT
+================================================================================
+1. Test 1 → si KO, RIEN d'autre ne marchera. Stop, debug GDK/GJK.
+2. Tests 2-3-4-5 enchaînés (1 seul combat).
+3. Test 11 (gagner le combat précédent).
+4. Test 6 (portée), Test 7 (tacle), Test 15 (éléments) → un nouveau combat.
+5. Test 12 (perdre).
+6. Test 13 (quit placement).
+7. Test 9 et 10 (reconnect) → demandent une déco brutale.
+8. Test 16 (spectateur) → nécessite 2 comptes.
+9. Test 17, 18 (stress tests).
+10. Test 14 (vol de vie) → seulement si tu as un sort approprié.
+11. Test 19, 20 → edge cases.
+
+
+================================================================================
+QUOI FAIRE SI UN TEST ÉCHOUE
+================================================================================
+1. Noter le numéro du test et le LOG observé.
+2. Faire un Clean + Build complet dans Eclipse (les .class peuvent être périmés).
+3. Vérifier qu'aucune erreur de compilation rouge n'existe.
+4. Relancer le serveur.
+5. Si toujours KO : signaler avec le patch suspecté.
+
+Fin du document.

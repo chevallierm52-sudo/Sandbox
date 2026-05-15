@@ -1,0 +1,10 @@
+NameBreed;mapId;cellId; =
+
+Ecaflip = 10276,311
+Enutrof = 10299,300
+Xelor = 10298,315
+Cra = 10292,299
+Sram = 10285,263
+Osamodas = 10284,386
+Iop = 10294,309
+Eniripsa = 10283,299

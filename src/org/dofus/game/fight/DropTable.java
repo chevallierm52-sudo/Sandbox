@@ -38,12 +38,20 @@ public class DropTable {
         public final int rate;       // sur 10 000
         public final int qtyMin;
         public final int qtyMax;
+        public final int minProsp;   // PP minimale requise (AncestraR : Drop.getMinProsp)
+        public int       max;        // nombre max d'occurences avant épuisement (AncestraR : Drop.get_max)
 
         public DropEntry(int templateId, int rate, int qtyMin, int qtyMax) {
+            this(templateId, rate, qtyMin, qtyMax, 0, Integer.MAX_VALUE);
+        }
+
+        public DropEntry(int templateId, int rate, int qtyMin, int qtyMax, int minProsp, int max) {
             this.templateId = templateId;
             this.rate       = rate;
             this.qtyMin     = qtyMin;
             this.qtyMax     = qtyMax;
+            this.minProsp   = minProsp;
+            this.max        = max;
         }
     }
 
@@ -71,6 +79,12 @@ public class DropTable {
     public static void addDrop(int monsterTemplateId, int templateId, int rate, int qtyMin, int qtyMax) {
         table.computeIfAbsent(monsterTemplateId, k -> new ArrayList<>())
              .add(new DropEntry(templateId, rate, qtyMin, qtyMax));
+    }
+
+    /** Retourne la liste brute (non roll'ée) des drops d'un monstre. Lecture seule. */
+    public static List<DropEntry> getDrops(int monsterTemplateId) {
+        List<DropEntry> entries = table.get(monsterTemplateId);
+        return entries == null ? new ArrayList<>() : new ArrayList<>(entries);
     }
 
     // ── Calcul du loot ────────────────────────────────────────────────────────

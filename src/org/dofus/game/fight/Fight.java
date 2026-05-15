@@ -19,6 +19,7 @@ import org.dofus.database.objects.ItemsData;
 import org.dofus.database.objects.SpellsData;
 import org.dofus.objects.WorldData;
 import org.dofus.objects.actors.Characters;
+import org.dofus.objects.actors.EOrientation;
 import org.dofus.objects.items.Inventory;
 import org.dofus.objects.items.Item;
 import org.dofus.objects.items.ItemTemplate;
@@ -38,16 +39,34 @@ public class Fight {
     private static final Logger logger = LoggerFactory.getLogger(Fight.class);
     private static final AtomicInteger FIGHT_ID_GEN = new AtomicInteger(1);
     private static final ConcurrentHashMap<Integer, Fight> activeFights = new ConcurrentHashMap<>();
+    /** Compteur global d'actions de jeu : chaque GA<gaId> doit être unique pour éviter
+     *  que le client 1.29 ne filtre les actions consécutives portant le même id. */
+    private static final AtomicInteger GA_ID = new AtomicInteger(1);
+
+    private static int nextGaId() { return GA_ID.getAndIncrement(); }
+    /** Variante publique pour MonsterAI et autres classes du package combat. */
+    public static int nextGaPacketId() { return GA_ID.getAndIncrement(); }
 
     private static final int PLACEMENT_DURATION_SEC = 30;
-    private static final int FIGHT_TYPE_PVM = 4;
+    /** Type combat envoyé dans GE : AncestraR utilise 0 (CHALLENGE) pour PvM, pas 4. */
+    private static final int FIGHT_TYPE_PVM = 4;            // pour GJK
+    private static final int FIGHT_GE_TYPE_CHALLENGE = 0;   // pour GE
     private static final int FIGHT_SPRITE_REFRESH_DELAY_MS = 100;
+    /** Délai laissé au client pour jouer l'animation d'un sort avant d'appliquer les effets. */
+    private static final long SPELL_ANIMATION_MS = 700L;
+    /** Marqueurs GAF (Game Action Finished) — convention AncestraR par type d'action. */
+    private static final int GAF_SPELL = 0;
+    private static final int GAF_MELEE = 1;
+    private static final int GAF_MOVE  = 2;
 
     public enum State { PLACEMENT, ACTIVE, FINISHED }
 
     private final int id;
     private final MapTemplate map;
     private final long createdAt = System.currentTimeMillis();
+    /** Marquage du passage en phase ACTIVE — sert au {@code time} du packet GE
+     *  (AncestraR : on n'inclut PAS la phase placement dans la durée du combat). */
+    private long       startedAt = 0L;
     private State state = State.PLACEMENT;
 
     private final LinkedHashMap<Integer, Fighter> fighters = new LinkedHashMap<>();
@@ -103,6 +122,7 @@ public class Fight {
         broadcast("GP" + team0Places + "|" + team1Places + "|0");
         broadcastFightSprites();
         broadcast(buildCoordinatesPacket());
+        broadcast("GDK");
         scheduleFightSpritesRefresh();
 
         cancelPlacementTimer();
@@ -116,7 +136,17 @@ public class Fight {
     public void removeFighter(int fighterId) {
         Fighter removed = fighters.remove(fighterId);
         if (turnOrder != null) turnOrder.removeIf(f -> f.getId() == fighterId);
-        if (removed != null) broadcast("GM|-" + fighterId);
+        if (removed != null) {
+            broadcast("GM|-" + fighterId);
+            if (removed.getType() == Fighter.FighterType.PLAYER) {
+                Characters chr = WorldData.getCharacterById(fighterId);
+                IoSession sess = sessionFor(removed);
+                if (chr != null && sess != null && sess.isConnected()) {
+                    chr.setLife((short) Math.max(1, removed.getCurrentLife()));
+                    map.addActor(chr);
+                }
+            }
+        }
         if (state == State.PLACEMENT && (getTeam(0).isEmpty() || getTeam(1).isEmpty())) cancelFight();
     }
 
@@ -126,7 +156,42 @@ public class Fight {
         cancelPlacementTimer();
         activeFights.remove(id);
         broadcast("GV");
-        logger.info("Fight {} canceled during placement", id);
+        // En placement, on garde la cellule roleplay d'origine de chaque joueur (chr.getCurrentCell()).
+        // restorePlayersAfterFight l'écraserait avec la cellule de placement combat.
+        for (Fighter f : fighters.values()) {
+            if (f.getType() != Fighter.FighterType.PLAYER) continue;
+            Characters chr = WorldData.getCharacterById(f.getId());
+            IoSession session = sessionFor(f);
+            if (chr != null && session != null && session.isConnected()) map.addActor(chr);
+        }
+        if (monsterGroup != null) {
+            map.addMonsterGroup(monsterGroup);
+            broadcastOnMap("GM|+" + monsterGroup.toGMEntry(), null);
+        }
+        logger.info("Fight {} canceled during placement, group={} restored={}",
+                new Object[] { id, monsterGroup != null ? monsterGroup.getId() : -1, monsterGroup != null });
+    }
+
+    public void handleAbandon(Fighter fighter) {
+        if (fighter == null || state != State.ACTIVE) return;
+        // Force la mort en infligeant tous les PV restants (résistance neutre clampée).
+        if (!fighter.isDead()) fighter.takeDamage(99999, 0);
+        // Format AncestraR exact (logs de combat) : un seul GA;103, pas de gaId, pas de GA;402.
+        // Pas de syncFightState non plus — le GIC/GTM ne sert à rien si on quitte.
+        broadcast("GA;103;" + fighter.getId() + ";" + fighter.getId());
+        if (turn.getCurrentFighter() != null && turn.getCurrentFighter().getId() == fighter.getId()) {
+            turn.endTurn();
+        }
+        if (checkWinCondition()) endFight();
+    }
+
+    private void broadcastOnMap(String packet, Characters except) {
+        if (map == null) return;
+        for (Characters actor : new ArrayList<Characters>(map.getActors().values())) {
+            if (actor == null || actor == except) continue;
+            IoSession actorSess = WorldData.getSessionByAccount().get(actor.getOwner());
+            if (actorSess != null && actorSess.isConnected()) actorSess.write(packet);
+        }
     }
 
     public boolean choosePlacementCell(Fighter fighter, short cell) {
@@ -158,6 +223,7 @@ public class Fight {
         if (state != State.PLACEMENT) return;
         cancelPlacementTimer();
         state = State.ACTIVE;
+        startedAt = System.currentTimeMillis();
         turnOrder = new ArrayList<Fighter>(fighters.values());
         Collections.sort(turnOrder, (a, b) -> Integer.compare(b.getInitiative(), a.getInitiative()));
         turnIndex = 0;
@@ -226,23 +292,102 @@ public class Fight {
     }
 
     private void handleMove(Fighter fighter, String pathStr) {
-        if (pathStr == null || pathStr.length() < 2) return;
+        if (pathStr == null || pathStr.length() < 3) return;
 
-        int steps = Math.max(0, (pathStr.length() / 2) - 1);
+        // Format Dofus 1.29 : chaque saut = 1 char direction + 2 chars cellule = 3 chars/step.
+        // Le path NE contient PAS la cellule de départ.
+        int requestedSteps = pathStr.length() / 3;
+        if (requestedSteps <= 0) return;
+
+        // Tronque le path au MP disponible (StarLoco isValidPath : si nStep > PM, on rejette;
+        // ici on tronque intelligemment pour ne pas frustrer le joueur qui clique loin).
+        int steps = Math.min(requestedSteps, fighter.getCurrentMP());
+        if (steps <= 0) return;
+        String effectivePath = pathStr.substring(0, steps * 3);
+
         short newCell;
         try {
-            newCell = decodeCellBase64(pathStr.substring(pathStr.length() - 2));
+            newCell = decodeCellBase64(effectivePath.substring(effectivePath.length() - 2));
         } catch (Exception ignored) {
             return;
         }
 
         if (!map.isValidCellId(newCell) || isOccupiedByOther(fighter, newCell)) return;
-        if (steps > 0 && !fighter.spendMP(steps)) return;
+        if (!fighter.spendMP(steps)) return;
 
+        // Animation côté client : path doit commencer par "a" + cellule de départ encodée
+        // (StarLoco Fight.onFighterMovement l.3066, sinon le sprite TP au lieu d'animer).
+        // Le gaId est INCRÉMENTÉ (cf nextGaId) : le client 1.29 filtre/déduplique
+        // les GA<id> consécutifs portant le même id → animations ignorées en série.
+        // GAS<actorId> précède le GA;1 — sans lui, certains clients 1.29 ignorent l'animation
+        // (AncestraR Fight.onFighterMovement l.3062 l'envoie systématiquement pour les players).
+        short fromCell = fighter.getCell();
+        String animPath = "a" + encodeCellBase64(fromCell) + effectivePath;
         fighter.setCell(newCell);
-        broadcast("GA1;1;" + fighter.getId() + ";" + pathStr);
-        if (steps > 0) broadcast("GA;129;" + fighter.getId() + ";" + fighter.getId() + ",-" + steps);
-        syncFightState();
+        // Met à jour l'orientation du joueur d'après la direction du dernier step :
+        // le 3e dernier char du `effectivePath` est le `dir` char de la dernière transition.
+        // Sans ça le sprite garde son orientation de placement après chaque déplacement.
+        if (effectivePath.length() >= 3) {
+            char lastDir = effectivePath.charAt(effectivePath.length() - 3);
+            EOrientation finalOrient = EOrientation.valueOf(StringUtils.HASH.indexOf(lastDir));
+            if (finalOrient != null) fighter.setOrientation(finalOrient);
+        }
+        broadcast("GAS" + fighter.getId());
+        broadcast("GA" + nextGaId() + ";1;" + fighter.getId() + ";" + animPath);
+
+        // Anim côté client : ~650 ms/case en roleplay (cf packets.log intervalle GA;1 → GKK).
+        // Séquence AncestraR après le mouvement :
+        //   1. GA;129;<id>;<id>,-N      (perte PM, PAS de gaId)
+        //   2. GAF2|<id>                (Game Action Finished pour mouvement)
+        // PAS de GIC ni de GTM ici — le client met à jour les positions via le path lui-même.
+        // GTM/GTR sont envoyés plus tard par endTurn() après que le client a ACK le GAF.
+        final int finalSteps = steps;
+        final int fighterId = fighter.getId();
+        long animMs = Math.max(900L, steps * 700L);
+        FightTurn.schedule(() -> {
+            if (state == State.FINISHED) return;
+            Fighter f = fighters.get(fighterId);
+            if (f == null || f.isDead()) return;
+            broadcast("GA;129;" + fighterId + ";" + fighterId + ",-" + finalSteps);
+            broadcast("GAF" + GAF_MOVE + "|" + fighterId);
+        }, animMs, TimeUnit.MILLISECONDS);
+    }
+
+    private List<Fighter> adjacentEnemies(Fighter ref, short fromCell) {
+        List<Fighter> result = new ArrayList<Fighter>();
+        for (Fighter f : fighters.values()) {
+            if (f.getId() == ref.getId() || f.isDead()) continue;
+            if (f.getTeamId() == ref.getTeamId()) continue;
+            int diff = Math.abs(f.getCell() - fromCell);
+            if (diff == 1 || diff == MAP_GRID_WIDTH) result.add(f);
+        }
+        return result;
+    }
+
+    private double tackleEscapeChance(Fighter fleeing, List<Fighter> taclers) {
+        int agiTotal = 0;
+        for (Fighter t : taclers) agiTotal += Math.max(0, t.getAgility());
+        int agiFlee = Math.max(0, fleeing.getAgility());
+        double chance = (agiFlee + 25.0) / (agiFlee + agiTotal + 50.0);
+        return Math.max(0.10, Math.min(0.90, chance));
+    }
+
+    private static final int MAP_GRID_WIDTH = 14;
+
+    private int manhattanDistance(short a, short b) {
+        int ax = a % MAP_GRID_WIDTH;
+        int ay = a / MAP_GRID_WIDTH;
+        int bx = b % MAP_GRID_WIDTH;
+        int by = b / MAP_GRID_WIDTH;
+        return Math.abs(ax - bx) + Math.abs(ay - by);
+    }
+
+    private boolean isInStraightLine(short a, short b) {
+        int ax = a % MAP_GRID_WIDTH;
+        int ay = a / MAP_GRID_WIDTH;
+        int bx = b % MAP_GRID_WIDTH;
+        int by = b / MAP_GRID_WIDTH;
+        return ax == bx || ay == by;
     }
 
     private void handleSpell(Fighter fighter, int spellId, String args) {
@@ -255,19 +400,36 @@ public class Fight {
         SpellTemplate.SpellLevel level = spell.getLevel(spellLevel);
         if (level == null) return;
 
-        short targetCell;
+        final short targetCell;
         try {
             targetCell = parseCellArg(args);
         } catch (Exception e) {
             return;
         }
+        if (!map.isValidCellId(targetCell)) return;
 
         int apCost = level.getApCost();
         if (!fighter.spendAP(apCost)) return;
 
-        broadcast("GA1;300;" + fighter.getId() + ";" + spellId + "," + targetCell + "," + spell.getSpritId() + "," + spellLevel + "," + targetCell + ",-1,1");
-        if (apCost > 0) broadcast("GA;102;" + fighter.getId() + ";" + fighter.getId() + ",-" + apCost);
+        // Ordre AncestraR exact (logs de combat capturés ligne 437-451) :
+        //   GAS<casterId>
+        //   GA;300;<casterId>;<spellId>,<targetCell>,<sprite>,<level>,<x>,<y>,<crit>
+        //   GA;100;<casterId>;<targetId>,-<dmg>   ← effets dégâts/soin IMMÉDIATS (queue client)
+        //   GA;103;<casterId>;<targetId>          ← si cible morte
+        //   GA;102;<casterId>;<casterId>,-<apCost> ← perte PA APRÈS les effets
+        //   GAF0|<casterId>                       ← Game Action Finished (signal fin serveur)
+        //
+        // PAS de délai entre les packets : le client met les animations en queue interne et
+        // les joue dans l'ordre. Un délai 700ms côté serveur séparait l'anim sort des
+        // dégâts → animation cassée car les effets apparaissaient AVANT l'anim sort finie.
+        // PAS de gaId sur les follow-up GA;... (AncestraR convention).
+        broadcast("GAS" + fighter.getId());
+        broadcast("GA;300;" + fighter.getId() + ";"
+                + spellId + "," + targetCell + "," + spell.getSpritId() + "," + spellLevel
+                + ",0,0,1");
 
+        // Application immédiate des effets (dégâts/soin/mort) — le client gère la queue
+        // d'animations côté UI.
         Fighter target = findFighterOnCell(targetCell);
         if (target != null) {
             for (SpellTemplate.SpellEffect effect : level.getEffects()) {
@@ -275,7 +437,15 @@ public class Fight {
             }
         }
 
-        syncFightState();
+        // Perte PA envoyée APRÈS les effets (ordre Ancestra l.450) — sinon le client peut
+        // démarrer l'anim "perte PA" en plein milieu de l'animation du sort.
+        if (apCost > 0) broadcast("GA;102;" + fighter.getId() + ";"
+                + fighter.getId() + ",-" + apCost);
+
+        // GAF0|<actor> — Game Action Finished. Le client peut envoyer son GKK0 quand
+        // toutes les animations sont jouées, puis on passera au tour suivant.
+        broadcast("GAF" + GAF_SPELL + "|" + fighter.getId());
+
         if (checkWinCondition()) endFight();
     }
 
@@ -285,6 +455,9 @@ public class Fight {
         int statBonus = getStatForElement(caster, effectIdToElement(effectId));
         int raw = value + statBonus / 10;
 
+        // Format AncestraR : les effets follow-up (100, 103, 108) sont envoyés SANS gaId :
+        //   GA;<effectId>;<caster>;<target>,<delta>
+        // Delta négatif = perte (100, dégâts), positif = gain (108, soin).
         if (effectId == 108) {
             int healed = target.heal(raw);
             broadcast("GA;108;" + caster.getId() + ";" + target.getId() + "," + healed);
@@ -305,8 +478,8 @@ public class Fight {
             }
 
             if (target.isDead()) {
+                // Format AncestraR : GA;103;<caster>;<target> (PAS de gaId, PAS de GA;402).
                 broadcast("GA;103;" + caster.getId() + ";" + target.getId());
-                broadcast("GA;402;" + caster.getId() + ";" + target.getId() + ";0");
             }
         }
     }
@@ -332,8 +505,18 @@ public class Fight {
 
         int winnerTeam = findWinnerTeam();
         RewardContext rewards = calculateAndApplyRewards(winnerTeam);
+        // Séquence AncestraR fin de combat (logs vérifiés) :
+        //   1. GE  : panneau résultat
+        //   2. fC0 : fight count = 0
+        //   3. GM  : re-spawn du groupe mob sur la map (background du panneau)
+        //   4. ILS1000 : "Information Lock Status" — signale que le client peut fermer
+        //   5. (PAS de GV ici — sinon le panneau se ferme avant d'être vu)
+        // Le client envoie GKK0 quand l'utilisateur clique "Fermer" → on lui sort
+        // alors la map via restorePlayersAfterFight (déclenché sur GC1 ultérieur).
         broadcast(buildResultPacket(winnerTeam, rewards));
+        broadcast("fC0");
         restorePlayersAfterFight();
+        broadcast("ILS1000");
         if (monsterGroup != null) {
             org.dofus.utils.MapRespawnService.scheduleRespawn(map, monsterGroup);
         }
@@ -345,46 +528,150 @@ public class Fight {
         RewardContext rewards = new RewardContext();
         if (winnerTeam != 0 || monsterGroup == null) return rewards;
 
-        int prospection = calculateTeamProspection(0);
+        List<Fighter> winners = alivePlayers(getTeam(0));
+        if (winners.isEmpty()) return rewards;
+
+        // --- Étape 1 : PP de groupe (somme prospection des winners) ---
+        int groupPP = 0;
+        for (Fighter w : winners) {
+            Characters chr = WorldData.getCharacterById(w.getId());
+            if (chr != null) {
+                groupPP += Statistic.totalWithEquipment(chr, EConstants.ADD_PROSPECTION.getInt());
+                groupPP += w.getChance() / 10;
+            }
+        }
+        groupPP = Math.max(100, groupPP);
+
+        // --- Étape 2 : agréger XP + kamas + drops bruts (avec PP boost + starBonus du groupe) ---
+        int totalMinKamas = 0;
+        int totalMaxKamas = 0;
+        int starBonusPct = monsterGroup != null ? monsterGroup.getStarBonus() : 0;
+        // Le groupPP est boosté par le starBonus pour les drops (AncestraR : factChalDrop += starBonus)
+        int effectivePP = (int) ((long) groupPP * (100 + starBonusPct) / 100L);
+        List<DropTable.DropEntry> possibleDrops = new ArrayList<DropTable.DropEntry>();
         for (MonsterGroup.MonsterEntry entry : monsterGroup.getMembers()) {
             MonsterTemplate.MonsterGrade grade = entry.getTemplate().getGrade(entry.getGrade());
             if (grade == null) continue;
             rewards.totalXp += grade.getXpBase();
-            rewards.totalKamas += DropTable.rollKamas(grade, prospection);
-            rewards.allDrops.addAll(DropTable.roll(entry.getTemplate().getId(), prospection));
+            totalMinKamas += grade.getKamasMin();
+            totalMaxKamas += grade.getKamasMax();
+            for (DropTable.DropEntry drop : DropTable.getDrops(entry.getTemplate().getId())) {
+                // Filtre AncestraR : drop ignoré si la PP groupe est sous le seuil minProsp.
+                if (drop.minProsp > effectivePP) continue;
+                int boostedRate = (int) Math.min(DropTable.MAX_RATE, (long) drop.rate * effectivePP / 100L);
+                possibleDrops.add(new DropTable.DropEntry(drop.templateId, boostedRate,
+                        drop.qtyMin, drop.qtyMax, drop.minProsp, drop.max));
+            }
         }
 
-        List<Fighter> winners = alivePlayers(getTeam(0));
-        if (winners.isEmpty()) return rewards;
+        // --- Étape 3 : trier winners par PP DESC (le plus PP loot en premier) ---
+        List<Fighter> sortedWinners = new ArrayList<Fighter>(winners);
+        sortedWinners.sort((a, b) -> {
+            Characters ca = WorldData.getCharacterById(a.getId());
+            Characters cb = WorldData.getCharacterById(b.getId());
+            int ppA = ca != null ? Statistic.totalWithEquipment(ca, EConstants.ADD_PROSPECTION.getInt()) : 0;
+            int ppB = cb != null ? Statistic.totalWithEquipment(cb, EConstants.ADD_PROSPECTION.getInt()) : 0;
+            return Integer.compare(ppB, ppA);
+        });
 
-        long xpPerWinner = Math.max(0, rewards.totalXp / winners.size());
-        long kamasPerWinner = Math.max(0, rewards.totalKamas / winners.size());
+        // --- Étape 4 : distribution drops (algo AncestraR Fight.java:2913) ---
+        int maxItemsPerPerso = Math.max(1, possibleDrops.size() / Math.max(1, sortedWinners.size()));
+        for (Fighter winner : sortedWinners) {
+            if (possibleDrops.isEmpty()) break;
+            List<DropTable.DropEntry> shuffled = new ArrayList<DropTable.DropEntry>(possibleDrops);
+            Collections.shuffle(shuffled);
+            int wonCount = 0;
+            List<DropTable.DropResult> wonByThisWinner = new ArrayList<DropTable.DropResult>();
+            for (DropTable.DropEntry drop : shuffled) {
+                if (wonCount >= maxItemsPerPerso) break;
+                int jet = (int) (Math.random() * DropTable.MAX_RATE);
+                if (jet < drop.rate) {
+                    int qty = drop.qtyMin + (drop.qtyMax > drop.qtyMin
+                            ? (int) (Math.random() * (drop.qtyMax - drop.qtyMin + 1))
+                            : 0);
+                    wonByThisWinner.add(new DropTable.DropResult(drop.templateId, qty));
+                    // AncestraR : décrémenter le max d'occurences, retirer si épuisé.
+                    drop.max--;
+                    if (drop.max <= 0) possibleDrops.remove(drop);
+                    wonCount++;
+                }
+            }
+            if (!wonByThisWinner.isEmpty()) {
+                rewards.dropsByFighter.put(winner.getId(), wonByThisWinner);
+                rewards.allDrops.addAll(wonByThisWinner);
+            }
+        }
 
-        for (Fighter f : winners) {
-            Characters chr = WorldData.getCharacterById(f.getId());
+        // --- Étape 5 : pré-calcul pour formule XP officielle AncestraR (Formulas.getXpWinPvm2) ---
+        int lvlMax = 1;
+        int lvlWinnersSum = 0;
+        for (Fighter w : winners) {
+            Characters chr = WorldData.getCharacterById(w.getId());
+            int lvl = chr != null ? chr.getExperience().getLevel() : w.getLevel();
+            if (lvl > lvlMax) lvlMax = lvl;
+            lvlWinnersSum += lvl;
+        }
+        int nbBonus = 0;
+        for (Fighter w : winners) {
+            Characters chr = WorldData.getCharacterById(w.getId());
+            int lvl = chr != null ? chr.getExperience().getLevel() : w.getLevel();
+            if (lvl > lvlMax / 3) nbBonus++;
+        }
+        // Table bonus AncestraR Formulas.getXpWinPvm2
+        double bonus;
+        switch (nbBonus) {
+            case 0: case 1: bonus = 1.0; break;
+            case 2: bonus = 1.1; break;
+            case 3: bonus = 1.3; break;
+            case 4: bonus = 2.2; break;
+            case 5: bonus = 2.5; break;
+            case 6: bonus = 2.8; break;
+            case 7: bonus = 3.1; break;
+            default: bonus = 3.5; break;
+        }
+        int lvlLoosersSum = 0;
+        for (Fighter f : getTeam(1)) {
+            lvlLoosersSum += f.getLevel();
+        }
+        double rapport1 = Math.max(1.3, 1.0 + (double) lvlLoosersSum / Math.max(1, lvlWinnersSum));
+        int starBonus = monsterGroup != null ? monsterGroup.getStarBonus() : 0;
+
+        // --- Étape 6 : kamas roll AncestraR Formulas.getKamasWin (roll [min, max], pas de partage) ---
+        rewards.totalKamas = totalMinKamas + (totalMaxKamas > totalMinKamas
+                ? (int) (Math.random() * (totalMaxKamas - totalMinKamas + 1))
+                : 0);
+
+        // --- Étape 7 : distribuer XP et kamas par winner ---
+        for (Fighter winner : winners) {
+            Characters chr = WorldData.getCharacterById(winner.getId());
             if (chr == null) continue;
-            if (xpPerWinner > 0) chr.getExperience().add(xpPerWinner);
-            if (kamasPerWinner > 0) chr.setKamas(chr.getKamas() + kamasPerWinner);
-            rewards.xpByFighter.put(f.getId(), xpPerWinner);
-            rewards.kamasByFighter.put(f.getId(), kamasPerWinner);
-        }
+            int winnerLevel = chr.getExperience().getLevel();
+            int sage = Statistic.totalWithEquipment(chr, EConstants.ADD_WISDOM.getInt());
+            double coef = (sage + 100.0) / 100.0;
+            double rapport2 = 1.0 + (double) winnerLevel / Math.max(1, lvlWinnersSum);
+            // Formule officielle : xpWin = groupXP × rapport1 × bonus × taux × coef × rapport2 × (1 + star/100)
+            long xpShare = (long) (rewards.totalXp * rapport1 * bonus * coef * rapport2);
+            if (starBonus > 0) xpShare = xpShare + xpShare * starBonus / 100L;
 
-        if (!rewards.allDrops.isEmpty()) {
-            Fighter receiver = winners.get(0);
-            rewards.dropsByFighter.put(receiver.getId(), new ArrayList<DropTable.DropResult>(rewards.allDrops));
-            Characters chr = WorldData.getCharacterById(receiver.getId());
-            IoSession sess = sessionFor(receiver);
-            if (chr != null) giveDrops(chr, sess, rewards.allDrops);
-        }
+            // Kamas : chaque joueur reçoit son propre roll (formule officielle AncestraR)
+            int kamasShare = (int) rewards.totalKamas;
 
-        for (Fighter f : winners) {
-            Characters chr = WorldData.getCharacterById(f.getId());
-            if (chr == null) continue;
-            IoSession sess = sessionFor(f);
-            if (kamasPerWinner > 0 && sess != null && sess.isConnected()) sess.write("Of+" + kamasPerWinner);
+            rewards.xpByFighter.put(winner.getId(), xpShare);
+            rewards.kamasByFighter.put(winner.getId(), (long) kamasShare);
+
+            if (xpShare > 0) chr.getExperience().add(xpShare);
+            if (kamasShare > 0) chr.setKamas(chr.getKamas() + kamasShare);
+
+            IoSession sess = sessionFor(winner);
+            List<DropTable.DropResult> winnerDrops = rewards.dropsByFighter.get(winner.getId());
+            if (winnerDrops != null && !winnerDrops.isEmpty()) {
+                giveDrops(chr, sess, winnerDrops);
+            }
+            if (kamasShare > 0 && sess != null && sess.isConnected()) sess.write("Of+" + kamasShare);
             if (sess != null && sess.isConnected()) org.dofus.utils.RegenService.start(chr);
             CharactersData.update(chr);
         }
+
         return rewards;
     }
 
@@ -401,16 +688,41 @@ public class Fight {
         if (sess != null && sess.isConnected()) sess.write("Ow" + chr.getInventory().getUsedPods() + "|" + chr.getMaxPods());
     }
 
+    /**
+     * Restauration serveur-side d'un fighter à la fin du combat :
+     *   - cellule roleplay d'origine (mémorisée à la création du Fighter)
+     *   - vie au minimum 1 (pas 0 même mort)
+     *   - persistance BDD
+     *   - annonce GM|+player aux AUTRES acteurs de la map roleplay
+     *
+     * On N'ENVOIE PAS le map view au joueur lui-même ici : il a le panneau résultat
+     * affiché par le GE et ne doit pas voir la map de fond avant d'avoir cliqué Fermer.
+     * Le map view est envoyé via {@link org.dofus.network.game.handlers.parsers.GameParser#creation}
+     * quand le client envoie GC1 après fermeture du panneau (séquence Ancestra exacte).
+     */
     private void restorePlayersAfterFight() {
         for (Fighter f : fighters.values()) {
             if (f.getType() != Fighter.FighterType.PLAYER) continue;
             Characters chr = WorldData.getCharacterById(f.getId());
             if (chr == null) continue;
-            chr.setCurrentCell(f.getCell());
+            short restoreCell = f.getOriginalCell() > 0 ? f.getOriginalCell() : f.getCell();
+            chr.setCurrentCell(restoreCell);
             chr.setLife((short)Math.max(1, f.getCurrentLife()));
             if (f.isDead()) PetService.onOwnerDeath(chr, sessionFor(f));
             IoSession session = sessionFor(f);
-            if (session != null && session.isConnected()) map.addActor(chr);
+            if (session != null && session.isConnected()) {
+                map.addActor(chr);
+                // Annonce uniquement aux AUTRES acteurs présents sur la map (le joueur
+                // lui-même reçoit son map view via GameParser.creation sur GC1).
+                StringBuilder selfEntry = new StringBuilder("GM|+");
+                org.dofus.network.game.protocols.GProtocol.getCharacterPattern(selfEntry, chr);
+                String selfPacket = selfEntry.toString();
+                for (Characters other : new ArrayList<Characters>(map.getActors().values())) {
+                    if (other == null || other == chr) continue;
+                    IoSession otherSess = WorldData.getSessionByAccount().get(other.getOwner());
+                    if (otherSess != null && otherSess.isConnected()) otherSess.write(selfPacket);
+                }
+            }
             CharactersData.update(chr);
         }
     }
@@ -446,7 +758,7 @@ public class Fight {
             session.write("GTL|" + buildTurnList());
             session.write(buildTurnStatusPacket());
             if (turn.getCurrentFighter() != null) {
-                session.write("GTS" + turn.getCurrentFighter().getId() + "|" + (FightTurn.TURN_DURATION_SEC * 1000));
+                session.write("GTS" + turn.getCurrentFighter().getId() + "|" + turn.getRemainingMs());
             }
         }
 
@@ -467,7 +779,7 @@ public class Fight {
             session.write("GS");
             session.write("GTL|" + buildTurnList());
             session.write(buildTurnStatusPacket());
-            if (turn.getCurrentFighter() != null) session.write("GTS" + turn.getCurrentFighter().getId() + "|" + (FightTurn.TURN_DURATION_SEC * 1000));
+            if (turn.getCurrentFighter() != null) session.write("GTS" + turn.getCurrentFighter().getId() + "|" + turn.getRemainingMs());
         }
     }
 
@@ -501,22 +813,28 @@ public class Fight {
     }
 
     void broadcastFightSprites() {
-        for (Fighter f : new ArrayList<Fighter>(fighters.values())) {
-            IoSession session = sessionFor(f);
-            if (session != null && session.isConnected()) sendFightSprites(session);
-        }
-        synchronized (spectators) {
-            spectators.removeIf(s -> s == null || !s.isConnected());
-            for (IoSession spectator : spectators) sendFightSprites(spectator);
-        }
+        String packet = buildAllSpritesGMPacket();
+        if (packet == null) return;
+        broadcast(packet);
     }
 
     private void sendFightSprites(IoSession session) {
         if (session == null || !session.isConnected()) return;
+        String packet = buildAllSpritesGMPacket();
+        if (packet != null) session.write(packet);
+    }
+
+    private String buildAllSpritesGMPacket() {
+        StringBuilder sb = new StringBuilder("GM");
+        boolean any = false;
         for (Fighter fighter : fighters.values()) {
-            String packet = buildSingleGMPacket(fighter);
-            if (packet != null) session.write(packet);
+            StringBuilder entry = new StringBuilder();
+            appendGMEntry(entry, fighter);
+            if (entry.length() == 0) continue;
+            sb.append("|+").append(entry);
+            any = true;
         }
+        return any ? sb.toString() : null;
     }
 
     private String buildSingleGMPacket(Fighter fighter) {
@@ -575,18 +893,21 @@ public class Fight {
         if (fighter.getType() == Fighter.FighterType.PLAYER) {
             Characters chr = WorldData.getCharacterById(fighter.getId());
             if (chr == null) return;
+            // Format StarLoco PlayerFighter.getGMPacketParts (officiel Dofus 1.29 fight) :
+            // cell;dir;0;id;name;classe;gfx^size;sex;level;align,0,grade,levelPlusId;
+            //   col1;col2;col3;accessories;currentPdv;baseAP;baseMP;resN;resE;resF;resW;resA;dodgePA;dodgePM;team
             String accessories = chr.getInventory() != null ? chr.getInventory().buildAccessories(true) : "";
+            int levelPlusId = chr.getExperience().getLevel() + fighter.getId();
             sb.append(fighter.getCell()).append(';')
-              .append(fighter.getOrientation().ordinal()).append(";0;")
+              .append("1;0;")
               .append(fighter.getId()).append(';')
               .append(chr.getName()).append(';')
               .append(chr.getBreed().getId()).append(';')
               .append(chr.getSkin()).append('^').append(chr.getSize()).append(';')
               .append(chr.getGender()).append(';')
               .append(chr.getExperience().getLevel()).append(';')
-              .append(chr.getAlignmentType()).append(",100,")
-              .append(chr.getAlignment().getLevel()).append(",0,")
-              .append(chr.getAlignment().getDishonor() > 0 ? 1 : 0).append(';')
+              .append(chr.getAlignmentType()).append(",0,0,")
+              .append(levelPlusId).append(';')
               .append(StringUtils.toHexOrNegative(chr.getColor1())).append(';')
               .append(StringUtils.toHexOrNegative(chr.getColor2())).append(';')
               .append(StringUtils.toHexOrNegative(chr.getColor3())).append(';')
@@ -599,28 +920,31 @@ public class Fight {
               .append(fighter.getResFire()).append(';')
               .append(fighter.getResWater()).append(';')
               .append(fighter.getResAir()).append(";0;0;")
-              .append(fighter.getTeamId()).append(";0");
+              .append(fighter.getTeamId());
             return;
         }
 
+        // Format AncestraR Fighter.getGmPacket case 2 (Mob) — identique mot pour mot :
+        //   cell;1;0;guid;templateId;-2;gfx^100;grade;c1;c2;c3;0,0,0,0;maxPdv;PA;PM;team
+        // - dir HARDCODÉ à "1" (la référence force _orientation = 1)
+        // - field 8 = grade index (1-5), PAS le level réel
+        // - colors = _mob.getTemplate().getColors().replace(",", ";") → "-1;-1;-1"
+        // - PAS de résistances séparées : juste maxPdv;PA;PM;team
+        // - PAS de trailing ; après team (sinon le client lit un champ vide à la fin)
         int gfx = fighter.getGfxId() > 0 ? fighter.getGfxId() : 31;
+        int gradeNum = fighter.getMobGrade() > 0 ? fighter.getMobGrade() : 1;
         sb.append(fighter.getCell()).append(';')
-          .append(fighter.getOrientation().ordinal()).append(";0;")
+          .append("1;0;")
           .append(fighter.getId()).append(';')
           .append(resultNameData(fighter)).append(';')
           .append("-2;")
-          .append(gfx).append("^100;")
-          .append(fighter.getLevel()).append(';')
+          .append(gfx).append("^100;") //FIXME: ^100 c'est la taille du monstre normalement il y a un formule avec le level du monstre pour déterminer ca taille
+          .append(gradeNum).append(';')
           .append("-1;-1;-1;")
           .append("0,0,0,0;")
-          .append(fighter.getCurrentLife()).append(';')
+          .append(fighter.getMaxLife()).append(';')
           .append(fighter.getBaseAP()).append(';')
           .append(fighter.getBaseMP()).append(';')
-          .append(fighter.getResNeutral()).append(';')
-          .append(fighter.getResEarth()).append(';')
-          .append(fighter.getResFire()).append(';')
-          .append(fighter.getResWater()).append(';')
-          .append(fighter.getResAir()).append(";0;0;")
           .append(fighter.getTeamId());
     }
 
@@ -689,37 +1013,132 @@ public class Fight {
 
     public void sendMovementEnd(Fighter fighter, int steps) {
         if (fighter == null || fighter.isDead()) return;
+        // Format AncestraR : GA;129;<id>;<id>,-N (PAS de gaId, pas de GIC/GTM ici).
+        // GTM/GTR sont diffusés par FightTurn.endTurn() après le tour.
         if (steps > 0) broadcast("GA;129;" + fighter.getId() + ";" + fighter.getId() + ",-" + steps);
-        syncFightState();
     }
 
 
+    /**
+     * Construit le packet {@code GE} (fenêtre résultat de fin de combat).
+     *
+     * Format AncestraR PvM (Fight.GetGE) :
+     * <pre>
+     *   GE&lt;time&gt;;&lt;starBonus&gt;|&lt;initiatorGUID&gt;|&lt;fightType&gt;|&lt;entry1&gt;|&lt;entry2&gt;|...
+     * </pre>
+     *
+     * Chaque entrée a un préfixe selon le rôle :
+     * <ul>
+     *   <li>{@code 2;...} — gagnant (player)</li>
+     *   <li>{@code 0;...} — perdant (player ou mob)</li>
+     * </ul>
+     *
+     * Les gagnants sont listés triés par prospection descendante (cohérent
+     * avec l'algorithme de distribution des drops).
+     */
     private String buildResultPacket(int winnerTeam, RewardContext rewards) {
-        int senderId = firstPlayerId();
-        long duration = Math.max(0, System.currentTimeMillis() - createdAt);
+        // AncestraR : <time> = durée de la phase ACTIVE seule (sans placement).
+        long fightStart = startedAt > 0L ? startedAt : createdAt;
+        long time       = Math.max(0L, System.currentTimeMillis() - fightStart);
+        int  initiator  = firstPlayerId();
+        int  starBonus  = monsterGroup != null ? monsterGroup.getStarBonus() : 0;
+
         StringBuilder sb = new StringBuilder("GE");
-        sb.append(duration).append('|').append(senderId).append('|').append(FIGHT_TYPE_PVM);
-        for (Fighter f : fighters.values()) {
-            sb.append('|').append(buildResultEntry(f, winnerTeam, rewards));
+        sb.append(time).append(';').append(starBonus);
+        // AncestraR : type 0 (CHALLENGE) pour PvM, pas 4 (FIGHT_TYPE_PVM) — voir Fight.GetGE.
+        sb.append('|').append(initiator).append('|').append(FIGHT_GE_TYPE_CHALLENGE).append('|');
+
+        // Tri winners par prospection desc — même ordre que la distribution
+        // des drops dans calculateAndApplyRewards (le + prospecteur loot en 1er).
+        List<Fighter> sortedWinners = new ArrayList<>(getTeam(winnerTeam));
+        sortedWinners.sort((a, b) -> Integer.compare(prospectionOf(b), prospectionOf(a)));
+
+        for (Fighter f : sortedWinners) {
+            sb.append(buildWinnerEntry(f, rewards)).append('|');
         }
+        for (Fighter f : getTeam(1 - winnerTeam)) {
+            sb.append(buildLoserEntry(f)).append('|');
+        }
+
+        // AncestraR garde le | trailing comme délimiteur de fin d'entrée — ne pas le retirer,
+        // sinon le client peut sauter la dernière entrée lors du parsing.
         return sb.toString();
     }
 
-    private String buildResultEntry(Fighter f, int winnerTeam, RewardContext rewards) {
-        int resultType = f.getTeamId() == winnerTeam ? 2 : 0;
-        String drops = buildDropList(rewards.dropsByFighter.get(f.getId()));
-        long kama = rewards.kamasByFighter.getOrDefault(f.getId(), 0L);
+    /**
+     * Entrée d'un joueur gagnant :
+     * {@code 2;<guid>;<name>;<lvl>;<dead>;<min>;<cur>;<max>;<winXp>;<guildXp>;<mountXp>;<drops>;<kamas>}.
+     * Les champs nuls sont laissés vides (""), conformément à AncestraR.
+     */
+    private String buildWinnerEntry(Fighter f, RewardContext rewards) {
+        long min   = 0L, cur = 0L, max = 0L;
+        int  level = f.getLevel();
+        String name = resultNameData(f);
+
         if (f.getType() == Fighter.FighterType.PLAYER) {
             Characters chr = WorldData.getCharacterById(f.getId());
-            long min = chr != null ? chr.getExperience().min() : 0;
-            long xp = chr != null ? chr.getExperience().getExperience() : 0;
-            long max = chr != null ? chr.getExperience().max() : 0;
-            long winXp = rewards.xpByFighter.getOrDefault(f.getId(), 0L);
-            int level = chr != null ? chr.getExperience().getLevel() : f.getLevel();
-            String name = chr != null ? chr.getName() : f.getName();
-            return resultType + ";" + f.getId() + ";" + name + ";" + level + ";" + (f.isDead() ? 1 : 0) + ";" + min + ";" + xp + ";" + max + ";" + winXp + ";0;0;" + drops + ";" + kama;
+            if (chr != null && chr.getExperience() != null) {
+                min   = chr.getExperience().min();
+                cur   = chr.getExperience().getExperience();
+                max   = chr.getExperience().max();
+                level = chr.getExperience().getLevel();
+                name  = chr.getName();
+            }
         }
-        return resultType + ";" + f.getId() + ";" + resultNameData(f) + ";" + f.getLevel() + ";" + (f.isDead() ? 1 : 0) + ";0;0;0;0;0;0;;0";
+
+        long winXp = rewards.xpByFighter.getOrDefault(f.getId(), 0L);
+        long kamas = rewards.kamasByFighter.getOrDefault(f.getId(), 0L);
+        String drops = buildDropList(rewards.dropsByFighter.get(f.getId()));
+
+        // Format AncestraR PvM winner (12 champs après le "2") :
+        //   2;guid;name;level;dead;min;cur;max;winXp;guildXp;mountXp;drops;kamas
+        // Mobs gagnants : champs XP/drops/kamas vides — le client affiche juste leur ligne.
+        // guildXp et mountXp non implémentés → laissés vides.
+        return "2;" + f.getId() + ";" + name + ";" + level + ";"
+             + (f.isDead() ? 1 : 0) + ";"
+             + min + ";" + cur + ";" + max + ";"
+             + emptyIfZero(winXp) + ";;;"
+             + drops + ";"
+             + emptyIfZero(kamas);
+    }
+
+    /**
+     * Entrée d'un perdant (joueur ou mob) :
+     * {@code 0;<guid>;<name>;<lvl>;<dead>;<min>;<cur>;<max>;;;;}.
+     * Les 4 derniers champs (winXp/guildXp/mountXp/drops) sont vides : un perdant ne gagne rien.
+     */
+    private String buildLoserEntry(Fighter f) {
+        long min   = 0L, cur = 0L, max = 0L;
+        int  level = f.getLevel();
+        String name = resultNameData(f);
+
+        if (f.getType() == Fighter.FighterType.PLAYER) {
+            Characters chr = WorldData.getCharacterById(f.getId());
+            if (chr != null && chr.getExperience() != null) {
+                min   = chr.getExperience().min();
+                cur   = chr.getExperience().getExperience();
+                max   = chr.getExperience().max();
+                level = chr.getExperience().getLevel();
+                name  = chr.getName();
+            }
+        }
+
+        int deadFlag = (f.isDead() || f.isDisconnected()) ? 1 : 0;
+        return "0;" + f.getId() + ";" + name + ";" + level + ";"
+             + deadFlag + ";"
+             + min + ";" + cur + ";" + max + ";;;;";
+    }
+
+    /** Renvoie {@code ""} si la valeur est 0 (convention AncestraR : champ vide), sinon la valeur. */
+    private static String emptyIfZero(long v) { return v == 0L ? "" : String.valueOf(v); }
+
+    /** Prospection effective d'un fighter (équipement + bonus chance). */
+    private int prospectionOf(Fighter f) {
+        if (f.getType() != Fighter.FighterType.PLAYER) return 0;
+        Characters chr = WorldData.getCharacterById(f.getId());
+        if (chr == null) return f.getChance() / 10;
+        return Statistic.totalWithEquipment(chr, EConstants.ADD_PROSPECTION.getInt())
+             + f.getChance() / 10;
     }
 
     private String buildDropList(List<DropTable.DropResult> drops) {
